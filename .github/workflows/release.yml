@@ -1,0 +1,57 @@
+# Builds FitSuite for Windows and publishes a GitHub release when a version tag (v1.2.3) is pushed.
+# FitSuite's updater reads the latest release and needs two of its files: FitSuite.exe and
+# FitSuite.exe.sha256 (published together, checked before use).
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      LLVM_MINGW_VERSION: "20240619"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build cmake zip clang
+
+      - name: llvm-mingw (Windows cross-compiler)
+        run: |
+          name="llvm-mingw-${LLVM_MINGW_VERSION}-ucrt-ubuntu-20.04-x86_64"
+          curl -sSL -o llvm-mingw.tar.xz "https://github.com/mstorsjo/llvm-mingw/releases/download/${LLVM_MINGW_VERSION}/${name}.tar.xz"
+          tar -xf llvm-mingw.tar.xz
+          echo "LLVM_MINGW=$PWD/${name}" >> "$GITHUB_ENV"
+
+      - name: Unit tests
+        run: |
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang
+          cmake --build build
+          ./build/fitsuite_tests
+
+      - name: Windows build and package
+        run: |
+          # The tag must match the version in CMakeLists.txt.
+          version="$(sed -n 's/^project(FitSuite VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match version ${version}"; exit 1
+          fi
+          tools/package.sh
+          cp "dist/FitSuite-${version}-preview-win64/FitSuite.exe" dist/FitSuite.exe
+          (cd dist && sha256sum FitSuite.exe > FitSuite.exe.sha256 && cat FitSuite.exe.sha256)
+
+      - name: Publish release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          notes="docs/releases/${GITHUB_REF_NAME}.md"
+          [ -f "$notes" ] || notes=/dev/null
+          gh release create "${GITHUB_REF_NAME}" dist/FitSuite-*-win64.zip dist/FitSuite.exe dist/FitSuite.exe.sha256 \
+            --title "FitSuite ${GITHUB_REF_NAME#v} (preview)" --notes-file "$notes"

@@ -1,0 +1,21 @@
+# Cross-compiling FitSuite for 64-bit Windows with llvm-mingw (clang + lld, UCRT).
+#   cmake -S . -B build-win -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/llvm-mingw-x86_64.cmake
+# Set LLVM_MINGW to the toolchain root if it is not /opt/llvm-mingw.
+set(CMAKE_SYSTEM_NAME Windows)
+set(CMAKE_SYSTEM_PROCESSOR x86_64)
+if(NOT DEFINED LLVM_MINGW)
+  if(DEFINED ENV{LLVM_MINGW})
+    set(LLVM_MINGW $ENV{LLVM_MINGW})
+  else()
+    set(LLVM_MINGW /opt/llvm-mingw)
+  endif()
+endif()
+set(CMAKE_C_COMPILER ${LLVM_MINGW}/bin/x86_64-w64-mingw32-clang)
+set(CMAKE_CXX_COMPILER ${LLVM_MINGW}/bin/x86_64-w64-mingw32-clang++)
+set(CMAKE_RC_COMPILER ${LLVM_MINGW}/bin/x86_64-w64-mingw32-windres)
+set(CMAKE_AR ${LLVM_MINGW}/bin/llvm-ar)
+set(CMAKE_RANLIB ${LLVM_MINGW}/bin/llvm-ranlib)
+set(CMAKE_FIND_ROOT_PATH ${LLVM_MINGW}/x86_64-w64-mingw32)
+set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
+set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
+set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
