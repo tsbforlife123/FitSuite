@@ -714,7 +714,8 @@ std::optional<SetupProfile> setup_from_json(const json& j, std::vector<std::stri
                 v.cm360 = e.num("cm360", 0.0, 0.0, 10000.0);
                 p.app.game_sens[it.key()] = v;
             }
-        p.app.setup_done = ap.flag("setup_done", true);  // files from before the setup: already set up
+        // Files from before the setup: players who already measured skip it; everyone else gets it.
+        p.app.setup_done = ap.flag("setup_done", !p.mouse_sessions.empty());
         p.app.setup_step = ap.i32("setup_step", 0, 0, 20);
         p.app.rawaccel_folder = ap.str("rawaccel_folder", "", false, 1024);
         p.app.rawaccel_install_pending = ap.flag("rawaccel_install_pending", false);
@@ -730,7 +731,7 @@ std::optional<SetupProfile> setup_from_json(const json& j, std::vector<std::stri
         // Older files: "Start with Windows" belonged to the per-game fix.
         p.app.start_with_windows = p.fix_games.enabled && p.fix_games.start_with_windows;
         p.app.start_hidden = true;
-        p.app.setup_done = true;
+        p.app.setup_done = !p.mouse_sessions.empty();
     }
 
     for (const auto& rr : r.arr("results")) {

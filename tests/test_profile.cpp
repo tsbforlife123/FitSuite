@@ -171,7 +171,7 @@ TEST_CASE("settings, mouse model and the last quick check round-trip; old files 
     CHECK(o->app.close_to_tray);
     CHECK_FALSE(o->app.show_extra_tools);
     CHECK(o->app.check_reminder_days == 7);
-    CHECK(o->app.setup_done);  // existing players are not sent through the first-run setup
+    CHECK(o->app.setup_done == !o->mouse_sessions.empty());  // only players who already measured skip the setup
     CHECK(o->app.update_check);
 
     json bad = to_json(p);
