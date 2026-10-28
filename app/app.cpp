@@ -992,6 +992,7 @@ void App::frame() {
     ImGui::End();
     ImGui::PopStyleVar(4);
     tick_pending_display(*this);
+    draw_update_prompt();
 }
 
 // ---- MouseFit only in your games ------------------------------------------------------------------

@@ -292,7 +292,7 @@ void updates(App& app, float w) {
     ui::begin_card("##set_updates", w, 0);
     ui::card_title("Updates");
     bool up = st.update_check;
-    if (ImGui::Checkbox("Check for updates once a day", &up)) {
+    if (ImGui::Checkbox("Check for updates when FitSuite opens", &up)) {
         st.update_check = up;
         app.save();
     }
