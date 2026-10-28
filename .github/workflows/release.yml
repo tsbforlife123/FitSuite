@@ -1,11 +1,12 @@
-# Builds FitSuite for Windows and publishes a GitHub release when a version tag (v1.2.3) is pushed.
+# Builds and tests FitSuite on every push to main, and publishes a GitHub release (tag v<version>,
+# created by GitHub) the first time a new version number from CMakeLists.txt reaches main.
 # FitSuite's updater reads the latest release and needs two of its files: FitSuite.exe and
 # FitSuite.exe.sha256 (published together, checked before use).
 name: release
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -39,19 +40,20 @@ jobs:
         run: |
           # The tag must match the version in CMakeLists.txt.
           version="$(sed -n 's/^project(FitSuite VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
-          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
-            echo "Tag ${GITHUB_REF_NAME} does not match version ${version}"; exit 1
-          fi
+          echo "VERSION=${version}" >> "$GITHUB_ENV"
           tools/package.sh
           cp "dist/FitSuite-${version}-preview-win64/FitSuite.exe" dist/FitSuite.exe
           (cd dist && sha256sum FitSuite.exe > FitSuite.exe.sha256 && cat FitSuite.exe.sha256)
 
-      - name: Publish release
-        if: github.ref_type == 'tag'
+      - name: Publish release (new versions only)
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          notes="docs/releases/${GITHUB_REF_NAME}.md"
+          tag="v${VERSION}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; nothing to publish."; exit 0
+          fi
+          notes="docs/releases/${tag}.md"
           [ -f "$notes" ] || notes=/dev/null
-          gh release create "${GITHUB_REF_NAME}" dist/FitSuite-*-win64.zip dist/FitSuite.exe dist/FitSuite.exe.sha256 \
-            --title "FitSuite ${GITHUB_REF_NAME#v} (preview)" --notes-file "$notes"
+          gh release create "$tag" dist/FitSuite-*-win64.zip dist/FitSuite.exe dist/FitSuite.exe.sha256 \
+            --target "$GITHUB_SHA" --title "FitSuite ${VERSION} (preview)" --notes-file "$notes"
