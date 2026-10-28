@@ -287,7 +287,7 @@ harness/linux/   development harness (not a product build)
 tests/           unit tests and the simulated player
 docs/            PLAN.md, MEASUREMENTS.md, MILESTONES.md, releases/ (release notes)
 tools/           build-windows.ps1, package.sh
-.github/         the release workflow: a pushed tag v1.2.3 builds, tests and publishes that release
+.github/         the release workflow: every push to main is built and tested; a new version number is published as a release
 ```
 
 ## Third-party software
