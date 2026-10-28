@@ -122,6 +122,9 @@ struct Updater {
     std::string expected_sha;
     std::filesystem::path exe;         // the downloaded and checked FitSuite.exe
     std::string message;
+    // The "Update available" box shown when FitSuite opens.
+    bool prompt_dismissed = false;     // "Not now": hidden until FitSuite is opened again
+    bool install_when_ready = false;   // "Update": install and restart as soon as the download is checked
 };
 
 class App {
@@ -323,6 +326,8 @@ private:
     bool shut_down_ = false;
     void tick_ra_install();
     void tick_updater();
+    void draw_update_prompt();
+    bool checked_this_launch_ = false;  // updates are checked once each time FitSuite opens
     double rawaccel_folder_checked_at_ = -100.0;
     std::filesystem::path rawaccel_folder_cache_;  // shutdown() ran (on exit, or when Windows ends the session)
     bool autostart_blocked_ = false;

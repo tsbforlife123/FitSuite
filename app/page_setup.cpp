@@ -208,7 +208,7 @@ void step_startup(App& app) {
               "nothing.");
     ImGui::Dummy(ImVec2(0, 6));
     bool up = st.update_check;
-    if (ImGui::Checkbox("Check for updates once a day", &up)) {
+    if (ImGui::Checkbox("Check for updates when FitSuite opens", &up)) {
         st.update_check = up;
         app.save();
     }

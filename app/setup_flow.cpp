@@ -155,8 +155,11 @@ void App::tick_ra_install() {
 
 void App::update_check(bool manual) {
     if (update_busy()) return;
+    const bool dismissed = updater.prompt_dismissed;  // "Not now" lasts until FitSuite is opened again
     updater = Updater{};
     updater.manual = manual;
+    updater.prompt_dismissed = dismissed;
+    checked_this_launch_ = true;
     std::string err;
     const fs::path dest = platform_.data_dir() / "update" / "latest-release.json";
     updater.token = platform_.start_download(kUpdateApiUrl, dest, &err);
@@ -202,11 +205,13 @@ std::string App::take_update_notice() {
 
 void App::tick_updater() {
     auto& u = updater;
-    // Daily check, when the player switched it on (the harness never goes online by itself).
+    // Checked every time FitSuite opens, and again once a day while it keeps running (in the
+    // notification area, say), when the player switched it on. The harness never goes online by itself.
     if (!u.token && setup_.app.update_check && !platform_.dev_harness() &&
         (u.step == Updater::Step::Idle || u.step == Updater::Step::UpToDate || u.step == Updater::Step::Failed)) {
         int64_t last = 0;
-        if (!parse_utc_iso(setup_.app.last_update_check_utc, last) || unix_now() - last > 24 * 3600) update_check(false);
+        if (!checked_this_launch_ || !parse_utc_iso(setup_.app.last_update_check_utc, last) || unix_now() - last > 24 * 3600)
+            update_check(false);
     }
     if (!u.token) return;
     const auto st = platform_.download_status(u.token);
@@ -231,7 +236,8 @@ void App::tick_updater() {
         u.release = rel;
         if (compare_versions(rel->version, parse_version(kAppVersion)) > 0) {
             u.step = Updater::Step::Available;
-            toast(ui::Tone::Info, "FitSuite " + rel->tag + " is available: Settings → Updates.", 10.0);
+            // Normally the "Update available" box asks; during the first-run setup a short note does.
+            if (!setup_.app.setup_done) toast(ui::Tone::Info, "FitSuite " + rel->tag + " is available: Settings → Updates.", 10.0);
         } else {
             u.step = Updater::Step::UpToDate;
         }
@@ -275,6 +281,59 @@ void App::tick_updater() {
         }
         u.step = Updater::Step::Ready;
     }
+}
+
+// The "Update available" box, in the middle of the window, when FitSuite opens and a newer version
+// exists. "Update" downloads it, checks it and restarts into it; "Not now" hides the box until
+// FitSuite is opened again (Settings → Updates still has it). Never shown during a test or the
+// first-run setup.
+void App::draw_update_prompt() {
+    auto& u = updater;
+    if (!setup_.app.setup_done || u.prompt_dismissed || !u.release || mouse.test || motion.test) return;
+    const bool working = u.install_when_ready;  // the player clicked Update
+    if (!working && u.step != Updater::Step::Available) return;
+    if (working && u.step == Updater::Step::Ready) {
+        u.install_when_ready = false;  // only once: update_install() restarts FitSuite
+        update_install();
+        return;
+    }
+
+    const ImGuiViewport* vp = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(ImVec2(vp->Pos.x + vp->Size.x * 0.5f, vp->Pos.y + vp->Size.y * 0.5f), ImGuiCond_Always,
+                            ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(480, 0));
+    ImGui::Begin("Update available", nullptr,
+                 ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+                     ImGuiWindowFlags_NoMove);
+    ui::wrapped(ui::fmt("FitSuite %s is available. You have %s.", u.release->tag.c_str(), kAppVersion).c_str());
+    if (!u.release->notes.empty()) {
+        std::string notes = u.release->notes;
+        if (notes.size() > 500) notes = notes.substr(0, 500) + "…";
+        ImGui::Spacing();
+        ui::wrapped(notes.c_str(), theme::kTextMuted);
+    }
+    ImGui::Spacing();
+    if (u.step == Updater::Step::Failed) {
+        ui::callout(ui::Tone::Bad, "The update did not work", u.message.c_str());
+        if (ui::button_secondary("Close")) {
+            u.install_when_ready = false;
+            u.prompt_dismissed = true;
+        }
+    } else if (working) {
+        const float frac = u.total ? float(double(u.bytes) / double(u.total)) : 0.0f;
+        ui::progress_bar(frac, "");
+        ui::faint("Downloading and checking the update. FitSuite restarts by itself when it is ready.");
+    } else {
+        ui::faint("Your settings and measurements stay as they are. FitSuite restarts into the new version.");
+        ImGui::Spacing();
+        if (ui::button_primary("Update")) {
+            u.install_when_ready = true;
+            update_download();
+        }
+        ImGui::SameLine();
+        if (ui::button_secondary("Not now")) u.prompt_dismissed = true;
+    }
+    ImGui::End();
 }
 
 void App::finish_setup() {
