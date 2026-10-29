@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstdio>
 
+#include "fit/game_activation.hpp"
 #include "fit/timeutil.hpp"
 
 namespace fit {
@@ -33,7 +34,11 @@ Conditions current_conditions(const SetupProfile& p) {
     put("mouse.device", !p.mouse.vid_pid.empty() ? p.mouse.vid_pid : p.mouse.name);
     if (p.mouse.dpi > 0) c["mouse.dpi"] = std::to_string(p.mouse.dpi);
     put("game.id", p.game.id);
-    if (p.game.sensitivity > 0) c["game.sensitivity"] = num(p.game.sensitivity);
+    if (game_yaw(main_game_exe(p.game.id)) > 0.0) {
+        if (p.game.sensitivity > 0) c["game.sensitivity"] = num(p.game.sensitivity);
+    } else if (p.game.cm360 > 0) {
+        c["game.cm360"] = num(p.game.cm360);
+    }
     put("pc.cpu", p.pc.cpu);
     put("pc.os", p.pc.os);
     if (!p.pc.gpus.empty()) {
@@ -49,7 +54,7 @@ Conditions current_conditions(const SetupProfile& p) {
 }
 
 std::vector<std::string> condition_keys(const std::string& tool) {
-    if (tool == "mousefit") return {"mouse.model", "mouse.device", "mouse.dpi", "game.id", "game.sensitivity"};
+    if (tool == "mousefit") return {"mouse.model", "mouse.device", "mouse.dpi", "game.id", "game.sensitivity", "game.cm360"};
     if (tool == "framefit") return {"pc.cpu", "pc.gpu", "pc.gpu_driver", "pc.os", "display.resolution", "game.id"};
     if (tool == "motionfit") return {"display.name", "display.resolution"};
     return {};
@@ -69,6 +74,7 @@ std::string describe_condition_key(const std::string& key) {
     static const std::map<std::string, std::string> names = {
         {"mouse.model", "Mouse model"},    {"mouse.device", "Mouse"},         {"mouse.dpi", "DPI"},
         {"game.id", "Game"},               {"game.sensitivity", "In-game sensitivity"},
+        {"game.cm360", "Full turn (cm/360)"},
         {"pc.cpu", "CPU"},                 {"pc.os", "Windows version"},
         {"pc.gpu", "GPU"},                 {"pc.gpu_driver", "GPU driver"},
         {"display.name", "Monitor"},       {"display.resolution", "Resolution"},
@@ -85,8 +91,9 @@ std::string describe_conditions(const Conditions& c) {
     };
     std::vector<std::string> parts;
     const std::string game = get("game.id");
-    if (!game.empty()) parts.push_back(game == "valorant" ? "VALORANT" : game);
+    if (!game.empty()) parts.push_back(game_display_name(main_game_exe(game)));
     if (!get("game.sensitivity").empty()) parts.push_back("sensitivity " + get("game.sensitivity"));
+    if (!get("game.cm360").empty()) parts.push_back(get("game.cm360") + " cm/360");
     if (!get("mouse.model").empty()) parts.push_back(get("mouse.model"));
     else if (!get("mouse.device").empty()) parts.push_back(get("mouse.device"));
     if (!get("mouse.dpi").empty()) parts.push_back(get("mouse.dpi") + " DPI");

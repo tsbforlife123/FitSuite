@@ -361,12 +361,20 @@ struct GameChoice {
     double yaw = 0.0;  // degrees per count at sensitivity 1, 0 = no conversion (enter cm/360)
 };
 std::vector<GameChoice> game_choices(const std::vector<std::string>& selected);
+// The main game: the one the player measures with (setup.game). The test turns the view like it.
+std::string main_game_name(const fit::SetupProfile& s);   // "VALORANT", "Counter-Strike 2", …
+bool is_main_game(const fit::SetupProfile& s, const GameChoice& g);
+bool main_game_ready(const fit::SetupProfile& s);           // DPI and the game's sensitivity (or cm/360) entered
+fit::GameMapping main_game_mapping(const fit::SetupProfile& s);
+std::string main_game_sens_label(const fit::SetupProfile& s);  // "VALORANT sensitivity" / "Fortnite full turn"
+void main_game_sens_input(App& app, float width);              // its sensitivity, or cm/360 for unconverted games
+void main_game_picker(App& app);                               // radio buttons, one per game
 // Mouse distance for a full turn, in cm (0 = not known).
-double valorant_cm360(const fit::SetupProfile& s);
+double main_game_cm360(const fit::SetupProfile& s);
 double game_cm360(const fit::SetupProfile& s, const GameChoice& g);
 // "turns 30% faster than VALORANT" ("" when unknown); *warn when it differs by more than 15%.
-// brief: "turns 30% faster" / "about the same", for a column that already says "compared with VALORANT".
-std::string turn_comparison(double game_cm, double valorant_cm, bool* warn, bool brief = false);
+// brief: "turns 30% faster" / "about the same", for a column that already names the main game.
+std::string turn_comparison(double game_cm, double main_cm, const std::string& main_name, bool* warn, bool brief = false);
 void staleness_line(App& app, const fit::Conditions& recorded, const std::string& tool);
 std::vector<fit::ConfigRuns> frame_config_runs(const fit::SetupProfile& s);
 void framefit_import(App& app, const std::string& config_id, const std::filesystem::path& csv, const std::string& origin);

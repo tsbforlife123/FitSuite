@@ -14,7 +14,16 @@ struct KnownGame {
     // Degrees of turn per mouse count at sensitivity 1 (hip-fire), for games where it is fixed and
     // published; 0 = no simple conversion (FOV-dependent or not verified), enter cm/360 instead.
     double yaw = 0.0;
+    // Where the sensitivity is in the game's menus, when FitSuite knows it; nullptr otherwise.
+    const char* sens_where = nullptr;
 };
+
+// The game the player measures with (SetupProfile::game.id). "valorant" (the id used before other
+// games could be chosen) and "" mean VALORANT; any other id is the game's executable name.
+std::string main_game_exe(const std::string& game_id);
+std::string game_id_for_exe(const std::string& exe);
+// Where to find the sensitivity in a game's menus: a known path, or general advice.
+std::string game_sens_where(const std::string& exe);
 
 // Shooters FitSuite recognises by executable name. Some games have several executables (DirectX 12
 // or Vulkan builds) under the same display name. Players can add any other game.

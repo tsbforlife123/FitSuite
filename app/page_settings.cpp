@@ -84,16 +84,16 @@ void mouse(App& app, float w) {
             setup.mouse.dpi = std::clamp(dpi, 50, 64000);
             app.save();
         }
-        row("VALORANT sensitivity");
-        float sens = float(setup.game.sensitivity);
-        ImGui::SetNextItemWidth(110);
-        if (ImGui::InputFloat("##sens", &sens, 0.0f, 0.0f, "%.3f")) {
-            setup.game.sensitivity = std::clamp(double(sens), 0.001, 20.0);
-            app.save();
-        }
+        row("Main game");
+        main_game_picker(app);
+        row(main_game_sens_label(setup).c_str());
+        main_game_sens_input(app, 110);
+        row("");
+        ui::faint("%s", game_sens_where(main_game_exe(setup.game.id)).c_str());
         row("Full turn (360°)");
-        const double cm = valorant_cm360(setup);
-        ImGui::Text("%.1f cm of mouse movement", cm);
+        const double cm = main_game_cm360(setup);
+        if (cm > 0) ImGui::Text("%.1f cm of mouse movement", cm);
+        else ImGui::TextDisabled("enter your setting");
         row("Check reminder");
         int r = setup.app.check_reminder_days >= 30 ? 2 : setup.app.check_reminder_days > 0 ? 1 : 0;
         bool changed = ImGui::RadioButton("Every week", &r, 1);
@@ -174,10 +174,11 @@ void tools(App& app, float w) {
 void game_sensitivity(App& app, float w) {
     auto& setup = app.setup();
     ui::begin_card("##set_games", w, 0);
-    ui::card_title("Game sensitivity",
-                   "Your fix was measured at your VALORANT sensitivity. It fits other games best where a full turn takes "
-                   "about the same mouse distance.");
-    const double val_cm = valorant_cm360(setup);
+    const std::string main_name = main_game_name(setup);
+    const std::string intro = "Your fix is measured at your " + main_name +
+                              " setting. It fits other games best where a full turn takes about the same mouse distance.";
+    ui::card_title("Game sensitivity", intro.c_str());
+    const double val_cm = main_game_cm360(setup);
     std::vector<GameChoice> rows;
     for (const auto& c : game_choices(setup.fix_games.games)) {
         bool on = false;
@@ -195,7 +196,7 @@ void game_sensitivity(App& app, float w) {
         ImGui::TableSetupColumn("Game", ImGuiTableColumnFlags_WidthFixed, 150);
         ImGui::TableSetupColumn("Your setting", ImGuiTableColumnFlags_WidthFixed, 230);
         ImGui::TableSetupColumn("Full turn", ImGuiTableColumnFlags_WidthFixed, 80);
-        ImGui::TableSetupColumn("Compared with VALORANT", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn(("Compared with " + main_name).c_str(), ImGuiTableColumnFlags_WidthStretch);
         ImGui::TableHeadersRow();
         for (const auto& c : rows) {
             ImGui::PushID(c.exes.front().c_str());
@@ -204,13 +205,13 @@ void game_sensitivity(App& app, float w) {
             ImGui::AlignTextToFramePadding();
             ImGui::TextUnformatted(c.name.c_str());
             ImGui::TableNextColumn();
-            const bool valorant =
-                std::find(c.exes.begin(), c.exes.end(), "valorant-win64-shipping.exe") != c.exes.end();
+            const bool valorant = is_main_game(setup, c);  // the main game (entered under Your mouse)
             if (valorant) {
                 ImGui::AlignTextToFramePadding();
-                ui::muted("%.3f", setup.game.sensitivity);
+                if (c.yaw > 0.0) ui::muted("%.3f", setup.game.sensitivity);
+                else ui::muted("%.1f cm per 360°", setup.game.cm360);
                 ImGui::SameLine();
-                ui::faint("in-game (under Your mouse)");
+                ui::faint("(under Your mouse)");
             } else {
                 GameSensitivity& gs = setup.app.game_sens[c.exes.front()];
                 ImGui::SetNextItemWidth(90);
@@ -246,7 +247,7 @@ void game_sensitivity(App& app, float w) {
                 ui::muted("fix measured here");
             } else {
                 bool warn = false;
-                const std::string cmp = turn_comparison(cm, val_cm, &warn, true);
+                const std::string cmp = turn_comparison(cm, val_cm, main_name, &warn, true);
                 if (cmp.empty()) ImGui::TextDisabled("enter your setting");
                 else ui::wrapped(cmp.c_str(), warn ? theme::kWarn : theme::kGood);
             }

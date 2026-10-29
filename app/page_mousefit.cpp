@@ -260,21 +260,21 @@ void tab_setup(App& app) {
 
     ImGui::SameLine(0, 14);
     ui::begin_card("##mf_game", w, 0);
-    ui::card_title("VALORANT sensitivity", "FitSuite's test scene turns the view exactly like VALORANT: 0.07° per count × sensitivity.");
-    float sens = float(setup.game.sensitivity);
-    ImGui::SetNextItemWidth(160);
-    if (ImGui::InputFloat("Sensitivity", &sens, 0.01f, 0.1f, "%.3f")) {
-        setup.game.sensitivity = std::clamp(double(sens), 0.001, 20.0);
-        app.save();
-    }
+    const double yaw = game_yaw(main_game_exe(setup.game.id));
+    const std::string game_note =
+        yaw > 0.0 ? ui::fmt("FitSuite's test scene turns the view exactly like %s: %.4g° per count × sensitivity.",
+                            main_game_name(setup).c_str(), yaw)
+                  : ui::fmt("FitSuite's test scene turns the view by the distance you entered for a full turn in %s.",
+                            main_game_name(setup).c_str());
+    ui::card_title(main_game_sens_label(setup).c_str(), game_note.c_str());
+    main_game_sens_input(app, 160);
     float scoped = float(setup.game.scoped_multiplier);
     ImGui::SetNextItemWidth(160);
     if (ImGui::InputFloat("Scoped multiplier", &scoped, 0.05f, 0.1f, "%.2f")) {
         setup.game.scoped_multiplier = std::clamp(double(scoped), 0.01, 10.0);
         app.save();
     }
-    GameMapping m;
-    m.sensitivity = setup.game.sensitivity;
+    const GameMapping m = main_game_mapping(setup);
     const double cm360 = 360.0 / m.deg_per_count() / std::max(setup.mouse.dpi, 1) * 2.54;
     ImGui::Dummy(ImVec2(0, 4));
     ui::metric("per count", ui::num(m.deg_per_count(), 4), "°", ui::Origin::Estimate);
@@ -338,7 +338,7 @@ void tab_calibrate(App& app) {
     const int flicks = ui_.calib_blocks * 64 + 32 + 36;
     ui::muted("%d targets + 40 s of tracking · about %d minutes · flick distances 7°, 13°, 20° and 26°", flicks,
               int(std::lround((ui_.calib_blocks * 55 + 25 + 40 + 40 + 25) / 60.0)));
-    const bool ready = setup.mouse.dpi > 0 && setup.game.sensitivity > 0;
+    const bool ready = main_game_ready(setup);
     if (!ready) ui::callout(ui::Tone::Warn, "Enter your DPI and sensitivity first", nullptr);
     ImGui::BeginDisabled(!ready);
     if (ui::button_primary("Start calibration")) app.start_calibration();
@@ -880,24 +880,114 @@ std::vector<GameChoice> game_choices(const std::vector<std::string>& selected) {
     return out;
 }
 
-double valorant_cm360(const SetupProfile& s) { return cm_per_360(0.07, s.game.sensitivity, s.mouse.dpi); }
+std::string main_game_name(const SetupProfile& s) { return game_display_name(main_game_exe(s.game.id)); }
+
+double main_game_cm360(const SetupProfile& s) {
+    const double yaw = game_yaw(main_game_exe(s.game.id));
+    if (yaw > 0.0) return cm_per_360(yaw, s.game.sensitivity, s.mouse.dpi);
+    return s.game.cm360 > 0.0 ? s.game.cm360 : 0.0;
+}
+
+bool main_game_ready(const SetupProfile& s) {
+    if (s.mouse.dpi <= 0) return false;
+    return game_yaw(main_game_exe(s.game.id)) > 0.0 ? s.game.sensitivity > 0.0 : s.game.cm360 > 0.0;
+}
+
+bool is_main_game(const SetupProfile& s, const GameChoice& g) {
+    const std::string main = main_game_exe(s.game.id);
+    return std::find(g.exes.begin(), g.exes.end(), main) != g.exes.end();
+}
+
+GameMapping main_game_mapping(const SetupProfile& s) {
+    GameMapping m;
+    m.game_id = s.game.id;
+    const double yaw = game_yaw(main_game_exe(s.game.id));
+    if (yaw > 0.0) {
+        m.deg_per_count_at_sens1 = yaw;
+        m.sensitivity = s.game.sensitivity;
+    } else if (s.game.cm360 > 0.0 && s.mouse.dpi > 0) {
+        // No published turn rate: the distance for a full turn fixes degrees per count directly.
+        m.deg_per_count_at_sens1 = 360.0 / (s.game.cm360 / 2.54 * double(s.mouse.dpi));
+        m.sensitivity = 1.0;
+    } else {
+        m.sensitivity = s.game.sensitivity;  // not set up yet: VALORANT's scale
+    }
+    return m;
+}
+
+void main_game_sens_input(App& app, float width) {
+    auto& s = app.setup();
+    const std::string exe = main_game_exe(s.game.id);
+    ImGui::SetNextItemWidth(width);
+    if (game_yaw(exe) > 0.0) {
+        float sens = float(s.game.sensitivity);
+        if (ImGui::InputFloat("##sens", &sens, 0.0f, 0.0f, "%.3f")) {
+            s.game.sensitivity = std::clamp(double(sens), 0.001, 100.0);
+            app.save();
+        }
+    } else {
+        float cm = float(s.game.cm360);
+        if (ImGui::InputFloat("##cm360", &cm, 0.0f, 0.0f, cm > 0 ? "%.1f" : "")) {
+            s.game.cm360 = std::clamp(double(cm), 0.0, 10000.0);
+            app.save();
+        }
+        ImGui::SameLine();
+        ui::faint("cm per 360°");
+        ui::help_marker("FitSuite cannot convert this game's sensitivity (its scale depends on the field of view). Measure "
+                        "how far you move the mouse for one full turn in the game, or use a sensitivity converter, and "
+                        "enter the distance.");
+    }
+}
+
+std::string main_game_sens_label(const SetupProfile& s) {
+    const std::string exe = main_game_exe(s.game.id);
+    return game_yaw(exe) > 0.0 ? main_game_name(s) + " sensitivity" : main_game_name(s) + " full turn";
+}
+
+void main_game_picker(App& app) {
+    auto& s = app.setup();
+    const std::string current = main_game_exe(s.game.id);
+    const auto choices = game_choices(s.fix_games.games);
+    if (ImGui::BeginTable("##main_game", 3, ImGuiTableFlags_SizingStretchSame)) {
+        for (const auto& c : choices) {
+            ImGui::TableNextColumn();
+            const bool on = std::find(c.exes.begin(), c.exes.end(), current) != c.exes.end();
+            if (ImGui::RadioButton(c.name.c_str(), on) && !on) {
+                // Keep the turn distance: the new game's sensitivity is filled in so a full turn takes
+                // the same mouse distance as before (the player checks it against the real value).
+                const double cm = main_game_cm360(s);
+                const std::string exe = c.exes.front();
+                s.game.id = game_id_for_exe(exe);
+                const double yaw = game_yaw(exe);
+                if (yaw > 0.0 && cm > 0.0 && s.mouse.dpi > 0) s.game.sensitivity = 360.0 * 2.54 / (yaw * cm * double(s.mouse.dpi));
+                else if (yaw <= 0.0) s.game.cm360 = cm;
+                bool ticked = false;  // the main game is one of "your games"
+                for (const auto& e : c.exes)
+                    ticked = ticked || std::find(s.fix_games.games.begin(), s.fix_games.games.end(), e) != s.fix_games.games.end();
+                if (!ticked) s.fix_games.games.push_back(exe);
+                app.save();
+            }
+        }
+        ImGui::EndTable();
+    }
+}
 
 double game_cm360(const SetupProfile& s, const GameChoice& g) {
-    if (std::find(g.exes.begin(), g.exes.end(), "valorant-win64-shipping.exe") != g.exes.end()) return valorant_cm360(s);
+    if (is_main_game(s, g)) return main_game_cm360(s);
     auto it = s.app.game_sens.find(g.exes.front());
     if (it == s.app.game_sens.end()) return 0.0;
     if (g.yaw > 0.0 && it->second.sensitivity > 0.0) return cm_per_360(g.yaw, it->second.sensitivity, s.mouse.dpi);
     return it->second.cm360 > 0.0 ? it->second.cm360 : 0.0;
 }
 
-std::string turn_comparison(double game_cm, double valorant_cm, bool* warn, bool brief) {
+std::string turn_comparison(double game_cm, double main_cm, const std::string& main_name, bool* warn, bool brief) {
     if (warn) *warn = false;
-    if (!(game_cm > 0.0) || !(valorant_cm > 0.0)) return "";
-    const double r = valorant_cm / game_cm;  // > 1: the game turns faster (less distance for a full turn)
-    if (std::fabs(r - 1.0) <= 0.10) return brief ? "about the same" : "about the same as VALORANT";
+    if (!(game_cm > 0.0) || !(main_cm > 0.0)) return "";
+    const double r = main_cm / game_cm;  // > 1: the game turns faster (less distance for a full turn)
+    if (std::fabs(r - 1.0) <= 0.10) return brief ? "about the same" : "about the same as " + main_name;
     if (warn) *warn = std::fabs(r - 1.0) > 0.15;
     return ui::fmt("turns %.0f%% %s%s", std::fabs(r - 1.0) * 100.0, r > 1.0 ? "faster" : "slower",
-                   brief ? "" : " than VALORANT");
+                   brief ? "" : (" than " + main_name).c_str());
 }
 
 // Writes settings.fitsuite-<time>.json next to the player's Raw Accel settings.json (which is not
@@ -940,7 +1030,7 @@ bool rawaccel_export(App& app, const RawAccelProfile& correction, const std::fil
 // Full MouseFit workflow with every statistic (Nerd stats → MouseFit).
 void mousefit_details(App& app) {
     static const char* labels[5] = {"Setup", "Calibrate", "Candidates", "Validate", "Apply"};
-    bool done[5] = {app.setup().mouse.dpi > 0 && app.setup().game.sensitivity > 0, app.mouse.calibration.has_value(),
+    bool done[5] = {main_game_ready(app.setup()), app.mouse.calibration.has_value(),
                     app.mouse.fit && app.mouse.fit->ok, app.mouse.comparison.has_value(),
                     !app.setup().active_mouse_profile.empty()};
     const int clicked = ui::steps(labels, 5, app.mouse.tab, done);
@@ -1086,7 +1176,7 @@ void page_mousefit(App& app) {
     const float lw = two_cols ? std::floor(std::min(520.0f, (avail - gap) * 0.47f)) : avail;
     const float rw = two_cols ? avail - lw - gap : avail;
 
-    const bool s1 = setup.mouse.dpi > 0 && setup.game.sensitivity > 0;
+    const bool s1 = main_game_ready(setup);
     const bool s2 = ui_.calibration.has_value();
     MouseProfileRecord* fix = game_fix(app);
     const bool fit_ok = ui_.fit && ui_.fit->ok;
@@ -1105,19 +1195,17 @@ void page_mousefit(App& app) {
             setup.mouse.dpi = std::clamp(dpi, 50, 64000);
             app.save();
         }
-        form_label("VALORANT sensitivity");
-        float sens = float(setup.game.sensitivity);
-        ImGui::SetNextItemWidth(110);
-        if (ImGui::InputFloat("##sens", &sens, 0.0f, 0.0f, "%.3f")) {
-            setup.game.sensitivity = std::clamp(double(sens), 0.001, 20.0);
-            app.save();
-        }
+        form_label(main_game_sens_label(setup).c_str());
+        main_game_sens_input(app, 110);
         form_label("Mouse");
         ImGui::TextUnformatted(!setup.mouse.model.empty() ? setup.mouse.model.c_str()
                                : !setup.mouse.name.empty() ? setup.mouse.name.c_str()
                                                            : "Not set (Settings)");
-        ui::help_marker("Use the DPI from your mouse software and the sensitivity from VALORANT's settings. Type your "
-                        "mouse model in Settings. To pick a specific mouse for the tests, see Nerd stats → Mouse → Setup.");
+        ui::help_marker(("Use the DPI from your mouse software and your sensitivity from " + main_game_name(setup) +
+                         " (" + game_sens_where(main_game_exe(setup.game.id)) +
+                         "). Change your main game or type your mouse model in Settings. To pick a specific mouse for "
+                         "the tests, see Nerd stats → Mouse → Setup.")
+                            .c_str());
         ImGui::EndTable();
     }
     if (setup.mouse_sessions.empty() && setup.mouse.dpi == 800 && std::fabs(setup.game.sensitivity - 0.4) < 1e-9)
@@ -1376,9 +1464,11 @@ void games_box(App& app, MouseProfileRecord* fix, float w) {
         }
         ImGui::SameLine();
         if (ui::button_secondary(ui_.show_running ? "Close list" : "Add a running game…")) ui_.show_running = !ui_.show_running;
-        ui::help_marker("Your fix was measured with your VALORANT sensitivity, so it suits shooters where a full turn takes "
-                        "about the same mouse distance. FitSuite only reads the name of the program in front (for example "
-                        "VALORANT-Win64-Shipping.exe); it never looks into a game, its screen or its memory.");
+        ui::help_marker(("Your fix is measured with your " + main_game_name(setup) +
+                         " setting, so it suits shooters where a full turn takes about the same mouse distance. FitSuite "
+                         "only reads the name of the program in front (for example VALORANT-Win64-Shipping.exe); it never "
+                         "looks into a game, its screen or its memory.")
+                            .c_str());
     }
     if (ui_.show_running) {
         int shown = 0;
@@ -1399,22 +1489,24 @@ void games_box(App& app, MouseProfileRecord* fix, float w) {
         ui::faint("Click a program to add it.");
     }
 
-    // Turn speed of the ticked games compared with the VALORANT setting the fix was measured at.
+    // Turn speed of the ticked games compared with the main-game setting the fix was measured at.
     {
-        const double val_cm = valorant_cm360(setup);
+        const double val_cm = main_game_cm360(setup);
+        const std::string main_name = main_game_name(setup);
         int unknown = 0;
         for (const auto& c : choices) {
             bool on = false;
             for (const auto& e : c.exes) on = on || selected(e);
-            if (!on || std::find(c.exes.begin(), c.exes.end(), "valorant-win64-shipping.exe") != c.exes.end()) continue;
+            if (!on || is_main_game(setup, c)) continue;
             bool warn = false;
-            const std::string cmp = turn_comparison(game_cm360(setup, c), val_cm, &warn);
+            const std::string cmp = turn_comparison(game_cm360(setup, c), val_cm, main_name, &warn);
             if (cmp.empty()) ++unknown;
             else if (warn)
                 ui::wrapped(ui::fmt("%s %s, so the fix may fit it less well.", c.name.c_str(), cmp.c_str()).c_str(), theme::kWarn);
         }
         if (unknown)
-            ui::faint("Enter your other games' sensitivity in Settings to see whether they turn like your VALORANT setting.");
+            ui::faint("Enter your other games' sensitivity in Settings to see whether they turn like your %s setting.",
+                      main_name.c_str());
     }
 
     bool sw = setup.app.start_with_windows;
