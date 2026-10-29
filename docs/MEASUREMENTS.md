@@ -338,7 +338,7 @@ Moving blocks cross grey lanes; you rate dark smearing (ghosting) and bright/dar
 
 ### Using the fix only in your games (per-game switching)
 
-The Mouse tab's box "4 Use it in your games" switches the fix on only while a game you ticked is in front:
+The Mouse tab's box "2 Use it in your games" switches the fix on only while a game you ticked is in front:
 
 * **What is read.** While this mode is on, Windows tells FitSuite when a different window comes to the front
   (`SetWinEventHook` for `EVENT_SYSTEM_FOREGROUND`, out of context: the event is posted to FitSuite's own thread

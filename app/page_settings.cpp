@@ -118,6 +118,15 @@ void mouse(App& app, float w) {
         ImGui::SameLine(0, 16);
         if (ui::confirm_link("Stop using my fix", "Stop using it? Your own Raw Accel settings come back.")) app.remove_fix();
     }
+    // The quick check: about a minute with the fix in use, to see whether it still fits.
+    if (fix && fix->last_check) {
+        const auto& lc = *fix->last_check;
+        const unsigned c = lc.verdict == "changed" ? theme::kWarn : lc.verdict == "still_fits" ? theme::kGood : theme::kTextMuted;
+        ui::wrapped(lc.explanation.c_str(), c);
+        ui::faint("Last quick check %s", short_time(lc.finished_utc).c_str());
+    } else if (fix) {
+        ui::faint("The quick check tells you, in about a minute, whether your fix still fits or your aim has changed.");
+    }
     ui::faint("A new mouse, DPI or sensitivity changes how your flicks land: measure again after changing any of them.");
     ui::end_card();
 }
@@ -187,7 +196,7 @@ void game_sensitivity(App& app, float w) {
         if (on) rows.push_back(c);
     }
     if (rows.empty()) {
-        ui::faint("Tick your games on the Mouse tab (\"4  Use it in your games\") to compare them here.");
+        ui::faint("Tick your games on the Mouse tab (\"2  Use it in your games\") to compare them here.");
         ui::end_card();
         return;
     }
