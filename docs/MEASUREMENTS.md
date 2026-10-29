@@ -456,8 +456,12 @@ Changes made by FitSuite with the way back.
 
 ### Mouse list (Settings → Your mouse)
 
-Typing a mouse model shows matches from a short list of popular mice (Logitech, Razer, Zowie, SteelSeries).
-Each entry holds only what its maker's product page states (sensor, DPI range or steps, top report rate), with
+The mouse model field searches about 200 gaming mice: every model Logitech, Razer, SteelSeries, Zowie,
+Corsair, HyperX, Glorious, Pulsar, Lamzu, Finalmouse, Endgame Gear and ASUS ROG listed on their own websites on
+29 October 2026 (base models; colour and signature editions are left out). About 30 of them carry specs; the
+others are names only, with every spec blank and a note to use the DPI from the mouse software, until their
+pages are checked. A mouse that is not listed can still be typed in. Each entry with specs holds only what its
+maker's product page states (sensor, DPI range or steps, top report rate), with
 that page and the date it was checked; anything a page does not state is left blank. Mice do not tell Windows
 their DPI or software settings, so FitSuite never reads those from the mouse. For a listed mouse FitSuite
 warns when the DPI you entered is outside its range or not one of its fixed steps, and when it measured more
