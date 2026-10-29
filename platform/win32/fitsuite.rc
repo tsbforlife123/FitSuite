@@ -4,8 +4,8 @@
 1 RT_MANIFEST "fitsuite.manifest"
 
 VS_VERSION_INFO VERSIONINFO
-FILEVERSION 0,2,3,0
-PRODUCTVERSION 0,2,3,0
+FILEVERSION 0,2,4,0
+PRODUCTVERSION 0,2,4,0
 FILEFLAGSMASK 0x3fL
 FILEFLAGS 0x0L
 FILEOS VOS_NT_WINDOWS32
@@ -18,11 +18,11 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "FitSuite"
             VALUE "FileDescription", "FitSuite - mouse, frame and motion calibration"
-            VALUE "FileVersion", "0.2.3"
+            VALUE "FileVersion", "0.2.4"
             VALUE "InternalName", "FitSuite"
             VALUE "OriginalFilename", "FitSuite.exe"
             VALUE "ProductName", "FitSuite"
-            VALUE "ProductVersion", "0.2.3 (preview)"
+            VALUE "ProductVersion", "0.2.4 (preview)"
         END
     END
     BLOCK "VarFileInfo"
