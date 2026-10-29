@@ -58,3 +58,15 @@ jobs:
           [ -f "$notes" ] || notes=/dev/null
           gh release create "$tag" dist/FitSuite-Setup.exe dist/FitSuite.zip dist/FitSuite.exe dist/FitSuite.exe.sha256 \
             --target "$GITHUB_SHA" --title "${VERSION}" --notes-file "$notes"
+
+      - name: Publish a test build (commit message contains "[test build]")
+        if: contains(github.event.head_commit.message, '[test build]')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A pre-release: GitHub's "latest release" (what FitSuite's updater reads) never points at it,
+          # so only people with the link get it.
+          short="${GITHUB_SHA::7}"
+          gh release create "test-${short}" dist/FitSuite-Setup.exe dist/FitSuite.zip dist/FitSuite.exe dist/FitSuite.exe.sha256 \
+            --target "$GITHUB_SHA" --prerelease --title "Test build ${short}" \
+            --notes "Test build for trying FitSuite on a real PC before the next release. Download FitSuite-Setup.exe and click Install. FitSuite's updater ignores test builds."
