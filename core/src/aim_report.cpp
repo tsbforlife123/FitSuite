@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdio>
 
+#include "fit/mouse_schedule.hpp"
 #include "fit/stats.hpp"
 
 namespace fit {
@@ -54,7 +55,15 @@ TrackingResult analyze_tracking(const std::vector<TrackSample>& all, int round) 
         const double e = ang_dist_deg(a.aim_yaw, a.aim_pitch, a.target_yaw, a.target_pitch);
         total += dt_s;
         err += e * dt_s;
-        if (e <= a.radius) on += dt_s;
+        // On target: on the target, or on its trail (where it was over the last kTrackTrailMs), as
+        // the test showed it.
+        bool on_now = e <= a.radius;
+        for (size_t j = i; !on_now && j > 0; --j) {
+            const TrackSample& b = *s[j - 1];
+            if (b.round != a.round || a.t_us - b.t_us > int64_t(kTrackTrailMs * 1000.0)) break;
+            on_now = ang_dist_deg(a.aim_yaw, a.aim_pitch, b.target_yaw, b.target_pitch) <= a.radius;
+        }
+        if (on_now) on += dt_s;
 
         // Direction gain, from steady stretches only: after the first 0.3 s, target moving steadily
         // for the last 0.25 s, crosshair still near it.

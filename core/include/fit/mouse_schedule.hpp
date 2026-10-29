@@ -31,7 +31,7 @@ struct RoundPlanOptions {
     bool micro_round = true;
     bool switch_round = true;
     bool track_round = true;
-    double flick_radius_deg = 1.2, micro_radius_deg = 0.6, switch_radius_deg = 1.0, track_radius_deg = 1.3;
+    double flick_radius_deg = 1.2, micro_radius_deg = 0.6, switch_radius_deg = 1.0, track_radius_deg = 1.8;
     double flick_timeout_ms = 2200.0, micro_timeout_ms = 2200.0, switch_timeout_ms = 3000.0;
     int switch_kills = 36, switch_visible = 3;
     double track_duration_ms = 40000.0;
@@ -84,6 +84,29 @@ Plan make_round_calibration_plan(const RoundPlanOptions& o);
 Plan make_validation_plan(const ValidationPlanOptions& o);
 // Out-and-back pairs: for each outward spec (dir/dist from the crosshair), a target back at the centre.
 std::vector<TargetSpec> out_and_back(const std::vector<TargetSpec>& outward);
+
+// The tracking round's target. It wanders inside a box around the round's centre and picks a new
+// direction and speed every 0.8–1.6 s, easing into it (about 0.3 s) instead of jumping, so it does
+// not suddenly speed up or slow down. Used by the test itself and by the simulated player in the
+// unit tests, so both move the target the same way.
+struct TrackMotion {
+    static constexpr double kBoxYaw = 15.0, kBoxPitch = 8.0;      // degrees either side of the centre
+    static constexpr double kMinSpeed = 6.0, kMaxSpeed = 18.0;    // degrees per second
+    static constexpr double kMinTurnS = 0.8, kMaxTurnS = 1.6;     // seconds between course changes
+    static constexpr double kEaseS = 0.1;                         // time constant of the easing
+
+    double yaw = 0.0, pitch = 0.0;            // position, relative to the centre (degrees)
+    double vyaw = 0.0, vpitch = 0.0;          // current velocity (degrees per second)
+    double goal_vyaw = 0.0, goal_vpitch = 0.0;
+    double next_turn_s = 0.0;
+
+    // Advances by dt seconds; t_s is the time played in the round so far.
+    void step(double t_s, double dt, Rng& rng);
+};
+
+// The tracking target leaves a short trail of where it was. Aiming at that trail still counts as on
+// target, so being a moment behind a moving target is not punished.
+inline constexpr double kTrackTrailMs = 150.0;
 
 // Picks targets from a block so the camera stays near the horizon (where count-space direction
 // matches what the player sees), inserting unscored positioning targets when needed.

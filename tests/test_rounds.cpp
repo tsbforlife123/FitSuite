@@ -1,5 +1,6 @@
 // Round-based calibration (format 2): plans, segmentation with a moving start, the fit on round
 // data, the aim report and tracking analysis, and storage.
+#include <algorithm>
 #include <cmath>
 #include <vector>
 
@@ -74,20 +75,13 @@ Session simulate_rounds(sim::SimUserParams p, uint64_t seed, const RoundPlanOpti
                 if (spec.dist_deg < 1.5) continue;
                 play(spec);
             }
-        } else {  // tracking: a target wandering at 8–30°/s, changing course every 0.6–1.4 s
-            double ty = 0, tp = 0, ay = 0, ap = 0, vy = 0, vp = 0, next_turn = 0;
+        } else {  // tracking: the same target movement as the test (TrackMotion)
+            double ay = 0, ap = 0;
+            TrackMotion m;
             const double dt = 1.0 / 240.0;
             for (double ts = 0; ts < bi.duration_ms / 1000.0; ts += dt) {
-                if (ts >= next_turn) {
-                    const double a = rng.uniform(0.0, 2.0 * kPi), sp = rng.uniform(8.0, 30.0);
-                    vy = sp * std::cos(a);
-                    vp = sp * std::sin(a);
-                    next_turn = ts + rng.uniform(0.6, 1.4);
-                }
-                if (std::fabs(ty + vy * dt) > 15.0) vy = -vy;
-                if (std::fabs(tp + vp * dt) > 8.0) vp = -vp;
-                ty += vy * dt;
-                tp += vp * dt;
+                m.step(ts, dt, rng);
+                const double ty = m.yaw, tp = m.pitch, vy = m.vyaw, vp = m.vpitch;
                 const Vec2 c = u.track_step(ts, dt, ty, tp, vy, vp, ay, ap, s.conditions.mapping);
                 ay += c.x * k;
                 ap -= c.y * k;
@@ -251,6 +245,52 @@ TEST_CASE("the aim report covers every round and tracking shows a directional la
     REQUIRE(even.ok);
     MESSAGE("unbiased tracking: " << even.summary);
     CHECK(even.summary.find("about equally") != std::string::npos);
+}
+
+TEST_CASE("tracking: a crosshair just behind the target is on its trail and counts as on target") {
+    // A target moving right at 10°/s; the crosshair follows on the same line, `lag_s` behind it.
+    auto run = [](double lag_s) {
+        std::vector<TrackSample> v;
+        const double speed = 10.0, dt = 1.0 / 240.0;
+        for (double ts = 0; ts < 10.0; ts += dt) {
+            TrackSample x;
+            x.t_us = int64_t(ts * 1e6);
+            x.target_yaw = float(speed * ts);
+            x.aim_yaw = float(speed * (ts - lag_s));
+            x.target_vyaw = float(speed);
+            x.radius = 0.6f;
+            v.push_back(x);
+        }
+        return analyze_tracking(v);
+    };
+    const TrackingResult close = run(0.10);  // 1.0° behind: off the target itself, but on its trail
+    REQUIRE(close.ok);
+    CHECK(close.on_target_pct > 95.0);
+    CHECK(close.mean_error_deg == doctest::Approx(1.0).epsilon(0.05));  // the distance is still measured
+    const TrackingResult far = run(0.40);  // 4° behind: past the trail's end too
+    REQUIRE(far.ok);
+    CHECK(far.on_target_pct < 5.0);
+}
+
+TEST_CASE("tracking motion eases into new directions and stays in its box") {
+    Rng rng(9);
+    TrackMotion m;
+    const double dt = 1.0 / 240.0;
+    double max_jump = 0.0, max_speed = 0.0;
+    double pvy = 0, pvp = 0;
+    for (double ts = 0; ts < 60.0; ts += dt) {
+        m.step(ts, dt, rng);
+        CHECK(std::fabs(m.yaw) <= TrackMotion::kBoxYaw + 0.1);
+        CHECK(std::fabs(m.pitch) <= TrackMotion::kBoxPitch + 0.1);
+        // Change of velocity per frame, not counting bounces off the box edge (a component changes sign).
+        const bool bounced = pvy * m.vyaw < 0 || pvp * m.vpitch < 0;
+        if (!bounced) max_jump = std::max(max_jump, std::hypot(m.vyaw - pvy, m.vpitch - pvp));
+        max_speed = std::max(max_speed, std::hypot(m.vyaw, m.vpitch));
+        pvy = m.vyaw, pvp = m.vpitch;
+    }
+    MESSAGE("largest speed change in one frame " << max_jump << " °/s, top speed " << max_speed << " °/s");
+    CHECK(max_jump < 2.0);  // smooth: at most a few °/s per frame, never a jump to a new speed
+    CHECK(max_speed <= TrackMotion::kMaxSpeed + 1e-6);
 }
 
 TEST_CASE("round-based sessions round-trip through their file format") {

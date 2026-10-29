@@ -47,8 +47,8 @@ targets; a target that runs out is a timeout. The view is re-centred at the star
 |---|---|---|
 | 1 Flicks | 8 directions (every 45°) × 4 distances (7°, 13°, 20°, 26° of rotation), radius 1.2° | 32 out from the centre, each followed by one back to it: 64 |
 | 2 Micro-adjustments | 8 directions × 2 distances (2°, 4°), radius 0.6° | 32 |
-| 3 Flicks | as round 1, new order | 64 |
-| 4 Tracking | keep the crosshair on a target wandering at 8–30°/s, changing course every 0.6–1.4 s, within ±15° × ±8° | 40 s |
+| 3 Returning flicks | as round 1, new order: flick out to a target, then back to the dot in the middle | 64 |
+| 4 Tracking | keep the crosshair on a target (radius 1.8°) wandering at 6–18°/s within ±15° × ±8°, easing into a new course every 0.8–1.6 s; a faint trail shows where it was over the last 0.15 s, and aiming at the trail counts as on target | 40 s |
 | 5 Target switching | 3 targets at a time at random spots within ±18° × ±9°, radius 1.0°; shoot them in any order | 36 |
 
 The out-and-back pairs keep the view near the horizon (so the direction you move the mouse matches the
@@ -158,7 +158,7 @@ For each kind of round: targets hit out of targets shown (misses and timeouts co
 time from a target appearing to the hit, and for switching the hits per minute. These are MEASURED values of
 that session, shown for your information; the fix is fitted from the flick, micro and switching flicks only.
 
-**Tracking:** the share of time the crosshair was on the target, the average distance from its centre, and how
+**Tracking:** the share of time the crosshair was on the target or its 0.15 s trail, the average distance from its centre, and how
 far behind the target you stay in each direction it moves. "Behind" is the distance along the target's path ÷
 its speed, as time, taken only while the target has moved steadily for 0.25 s (and not in the first 0.3 s of
 the round). Everyone trails by about a reaction time; a direction where you trail at least 30 ms more than your
