@@ -1104,7 +1104,8 @@ std::string flick_story(const std::vector<DirectionSummary>& dirs) {
 // One click: corrected copy of the player's Raw Accel settings → saved copy of settings.json →
 // corrected settings in its place → applied with Raw Accel's writer.
 void use_in_rawaccel(App& app, const RawAccelProfile& fix, bool choose_again) {
-    std::filesystem::path sj = choose_again ? std::filesystem::path() : app.rawaccel_settings_path();
+    std::string note;
+    std::filesystem::path sj = choose_again ? std::filesystem::path() : app.rawaccel_settings_ready(&note);
     if (sj.empty()) {
         auto picked = app.platform().open_file_dialog("Choose settings.json in your Raw Accel folder", "Raw Accel settings", "settings.json");
         if (!picked) return;
@@ -1114,7 +1115,7 @@ void use_in_rawaccel(App& app, const RawAccelProfile& fix, bool choose_again) {
     if (!rawaccel_export(app, fix, sj)) return;
     std::string msg;
     app.rawaccel_make_default(sj, app.mouse.ra_generated, &msg);
-    app.mouse.patch_message = msg;
+    app.mouse.patch_message = note.empty() ? msg : note + " " + msg;
 }
 
 const AppliedChange* active_rawaccel_change(const SetupProfile& s) {
@@ -1146,7 +1147,8 @@ void form_label(const char* text) {
 
 // Turns the per-game fix on with the remembered Raw Accel settings.json (asks for it the first time).
 void turn_on_in_games(App& app) {
-    std::filesystem::path sj = app.rawaccel_settings_path();
+    std::string note;
+    std::filesystem::path sj = app.rawaccel_settings_ready(&note);
     if (sj.empty())
         if (auto picked = app.platform().open_file_dialog("Choose settings.json in your Raw Accel folder", "Raw Accel settings",
                                                           "settings.json"))
@@ -1154,7 +1156,7 @@ void turn_on_in_games(App& app) {
     if (sj.empty()) return;
     std::string msg;
     if (app.games_turn_on(sj, &msg)) app.remember_rawaccel_settings_path(sj);
-    app.mouse.patch_message = msg;
+    app.mouse.patch_message = note.empty() ? msg : msg.empty() ? note : note + " " + msg;
 }
 
 void choose_fix(App& app, MouseProfileRecord& fix) {

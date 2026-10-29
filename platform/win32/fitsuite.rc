@@ -22,7 +22,7 @@ BEGIN
             VALUE "InternalName", "FitSuite"
             VALUE "OriginalFilename", "FitSuite.exe"
             VALUE "ProductName", "FitSuite"
-            VALUE "ProductVersion", "0.2.4 (preview)"
+            VALUE "ProductVersion", "0.2.4"
         END
     END
     BLOCK "VarFileInfo"

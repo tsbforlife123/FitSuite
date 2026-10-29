@@ -297,11 +297,12 @@ void updates(App& app, float w) {
     ui::begin_card("##set_updates", w, 0);
     ui::card_title("Updates");
     bool up = st.update_check;
-    if (ImGui::Checkbox("Check for updates when FitSuite opens", &up)) {
+    if (ImGui::Checkbox("Check for updates automatically", &up)) {
         st.update_check = up;
         app.save();
     }
-    ui::faint("From FitSuite's public releases (github.com/%s). Nothing about you is sent.", fit::kUpdateRepo);
+    ui::faint("On by default: each time FitSuite opens, and once a day while it runs. From FitSuite's public releases "
+              "(github.com/%s). Nothing about you is sent.", fit::kUpdateRepo);
     ImGui::Dummy(ImVec2(0, 2));
     using S = Updater::Step;
     switch (u.step) {
@@ -313,14 +314,14 @@ void updates(App& app, float w) {
             ImGui::EndDisabled();
             ImGui::SameLine(0, 12);
             ImGui::AlignTextToFramePadding();
-            if (u.step == S::UpToDate) ImGui::TextColored(theme::v4(theme::kGood), "FitSuite %s is the latest version.", kAppVersion);
+            if (u.step == S::UpToDate) ImGui::TextColored(theme::v4(theme::kGood), "You have the latest version (%s).", kAppVersion);
             else if (u.step == S::Failed) ui::wrapped(u.message.c_str(), theme::kWarn);
             else if (!st.last_update_check_utc.empty()) ui::faint("Last checked %s", short_time(st.last_update_check_utc).c_str());
             break;
         }
         case S::Checking: ui::muted("Checking…"); break;
         case S::Available: {
-            ImGui::TextColored(theme::v4(theme::kAccent), "FitSuite %s is available (you have %s).", u.release->tag.c_str(), kAppVersion);
+            ImGui::TextColored(theme::v4(theme::kAccent), "Version %s is available (you have %s).", u.release->version_text().c_str(), kAppVersion);
             if (!u.release->notes.empty()) {
                 std::string notes = u.release->notes;
                 if (notes.size() > 600) notes = notes.substr(0, 600) + "…";
@@ -331,12 +332,12 @@ void updates(App& app, float w) {
         }
         case S::Downloading: {
             const float f = u.total ? float(double(u.bytes) / double(u.total)) : 0.0f;
-            ui::progress_bar(f, ui::fmt("Downloading %s… %.1f MB", u.release ? u.release->tag.c_str() : "", double(u.bytes) / 1048576.0).c_str(),
+            ui::progress_bar(f, ui::fmt("Downloading version %s… %.1f MB", u.release ? u.release->version_text().c_str() : "", double(u.bytes) / 1048576.0).c_str(),
                              360, 14);
             break;
         }
         case S::Ready: {
-            ImGui::TextColored(theme::v4(theme::kGood), "%s downloaded and checked.", u.release ? u.release->tag.c_str() : "The update");
+            ImGui::TextColored(theme::v4(theme::kGood), "Version %s downloaded and checked.", u.release ? u.release->version_text().c_str() : "");
             if (ui::button_primary("Update now (FitSuite restarts)")) app.update_install();
             ImGui::SameLine(0, 12);
             ui::faint("Your settings and measurements stay as they are.");
@@ -349,7 +350,7 @@ void updates(App& app, float w) {
 void about(App& app, float w) {
     ui::begin_card("##set_about", w, 0);
     ui::card_title("About");
-    ImGui::Text("FitSuite %s (preview)", kAppVersion);
+    ImGui::TextUnformatted("FitSuite");
     ui::faint("Local only: no account, no cloud, nothing uploaded. Not tested on Windows hardware yet; please report anything "
               "that does not work as described.");
     ui::faint("Your data: %s", app.platform().data_dir().string().c_str());

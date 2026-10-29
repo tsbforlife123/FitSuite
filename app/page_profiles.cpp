@@ -234,6 +234,7 @@ void page_profiles(App& app) {
                                    : c.kind == "mousefit.rawaccel_default" ? "Raw Accel: correction made default"
                                    : c.kind == "mousefit.rawaccel_games"   ? "Raw Accel: fix switched on in your games"
                                    : c.kind == "app.startup_entry"         ? "Open FitSuite when Windows starts"
+                                   : c.kind == "rawaccel.settings_created" ? "Raw Accel: default settings file written"
                                                                            : c.kind.c_str());
             ImGui::TableNextColumn();
             if (c.kind == "mousefit.rawaccel_games")

@@ -17,29 +17,29 @@ own PC, starting with VALORANT. Its main tool is the mouse fix; two optional too
 The optional tools are hidden until you tick **Settings → Extra tools**.
 
 Everything stays on your computer. There is no account, subscription, cloud service or AI service. FitSuite
-goes online only to check for its own updates (once a day, can be switched off) and, when you click it, to
+goes online only to check for its own updates (each time it opens, on by default, can be switched off) and, when you click it, to
 download Raw Accel during the setup.
 
-> **Preview status.** Version 0.2.0 has been built and tested with simulated data, but it has **not yet been
-> run on a Windows PC**. Treat it as a preview and see [docs/MILESTONES.md](docs/MILESTONES.md) for exactly
-> what was checked.
+> **Status.** FitSuite has been built and tested with simulated data, but it has **not yet been run on a
+> Windows PC**. See [docs/MILESTONES.md](docs/MILESTONES.md) for exactly what was checked.
 
 ---
 
 ## Quick start (Windows 10 or 11, 64-bit)
 
-There is nothing to install and no local server to set up: FitSuite is a single program.
+1. Download **FitSuite-Setup.exe** from the [releases page](https://github.com/tsbforlife123/FitSuite/releases)
+   and open it.
+   It is not code-signed, so Windows may show "Windows protected your PC". Click **More info → Run anyway**.
+2. Click **Install**. FitSuite is installed for your Windows account only (no administrator rights) in
+   `%LOCALAPPDATA%\Programs\FitSuite`, with a Start menu shortcut and a desktop shortcut (each can be
+   unticked), and opens. Settings and measurements from an earlier copy are kept.
+3. The first time, a short **setup** opens: your mouse (DPI, the game you play most and its sensitivity,
+   model), your monitor's refresh rate, Raw Accel (FitSuite can download and install it for you), startup and
+   updates. Then click **Measure my flicks**. Everything the setup asks is also on the **Settings** tab later.
+4. Later versions install themselves: FitSuite checks when it opens and asks **Update / Not now**.
 
-1. Download `FitSuite-0.2.0-preview-win64.zip` (from the
-   [releases page](https://github.com/tsbforlife123/FitSuite/releases) once it is published).
-2. Right-click it → **Extract All…** and pick a folder, for example `Documents\FitSuite`.
-3. Double-click **FitSuite.exe**.
-   The preview is not code-signed, so Windows may show "Windows protected your PC". Click **More info → Run
-   anyway**. FitSuite does not need administrator rights.
-4. The first time, a short **setup** opens: your mouse (DPI, VALORANT sensitivity, model), your monitor's
-   refresh rate, Raw Accel (FitSuite can download and install it for you), startup and updates. Then click
-   **Measure my flicks**. Everything the setup asks is also on the **Settings** tab later.
-5. Later versions install themselves: **Settings → Updates → Download the update → Update now**.
+Prefer no installer? **FitSuite.zip** on the same page holds the same `FitSuite.exe`: extract it anywhere and
+double-click it.
 
 ### The window
 
@@ -97,17 +97,23 @@ Shown the first time FitSuite opens (and from **Settings → About → Run the s
 monitor (it offers the faster refresh rate if Windows is set lower), Raw Accel, startup and updates. For Raw
 Accel it finds an existing install, or downloads the official Raw Accel 1.7.1 release from GitHub, checks it
 against that release's SHA-256, unpacks it to `%LOCALAPPDATA%\Programs\RawAccel` and starts its installer;
-Windows asks for permission, and a restart finishes it. After the restart the setup continues and helps you
-open Raw Accel once so it saves its settings. Every step can be skipped.
+Windows asks for permission, and a restart finishes it. After the restart the setup continues. Raw Accel only
+saves its `settings.json` after you click Apply in it, so when there is none yet FitSuite writes Raw Accel's
+own default settings there (listed under History); nothing has to be opened by hand. Every step can be skipped.
 
 ### Updates
 
-With **Check for updates once a day** on (the default; Settings → Updates), FitSuite asks GitHub for the
-latest release of [tsbforlife123/FitSuite](https://github.com/tsbforlife123/FitSuite/releases). When there is a
-newer version the status bar says so. **Download the update** fetches it and checks it against its published
-SHA-256; **Update now** swaps in the new `FitSuite.exe` and restarts. Your settings and measurements stay as
+With **Check for updates automatically** on (the default; Settings → Updates), FitSuite asks GitHub for the
+latest release of [tsbforlife123/FitSuite](https://github.com/tsbforlife123/FitSuite/releases) each time it opens
+and once a day while it runs. When there is a newer version a box asks **Update / Not now**: Update downloads
+it, checks it against its published SHA-256, swaps in the new `FitSuite.exe` and restarts (Settings → Updates
+does the same by hand). Your settings and measurements stay as
 they are. If FitSuite's folder is not writable (e.g. inside Program Files), it says so and you download the new
-zip yourself. Releases are built from the tagged source by the repository's GitHub workflow.
+zip yourself. Releases are built from the tagged source by the repository's GitHub workflow; each is titled
+with its version number, which also appears in its notes.
+
+**What's new.** This version's notes open each time FitSuite opens, until you click **Don't show again**; the
+next update's notes show again. **What's new** in the bottom-right corner opens them any time.
 
 ### Running in the background
 
@@ -191,12 +197,13 @@ administrator rights and a restart.
 
 ### Removing FitSuite
 
-If the per-game mouse fix is on, turn it off first (Mouse tab → 2 Use it in your games → **Turn off**): that
-puts your own Raw Accel settings back. Untick **Settings → Open FitSuite when Windows starts** to remove its
-startup entry. Then quit FitSuite (right-click its notification-area icon → Quit) and delete the folder you
-extracted and `%LOCALAPPDATA%\FitSuite`. If you applied a refresh rate with FitSuite, change it back in Windows
-display settings (the History tab lists every change FitSuite made). Raw Accel is a separate program: remove it
-with `uninstaller.exe` in its folder (`%LOCALAPPDATA%\Programs\RawAccel` if the setup installed it).
+**Windows Settings → Apps → FitSuite → Uninstall** (installed with FitSuite-Setup.exe). It closes FitSuite
+(which puts your own Raw Accel settings back), removes the startup entry, the shortcuts and `FitSuite.exe`, and
+asks whether to delete your measurements and settings too (`%LOCALAPPDATA%\FitSuite`; No keeps them). For the
+zip version: turn the per-game fix off, untick **Open FitSuite when Windows starts**, quit FitSuite and delete
+its folder. If you applied a refresh rate with FitSuite, change it back in Windows display settings (the History
+tab lists every change FitSuite made). Raw Accel is a separate program: remove it with `uninstaller.exe` in its
+folder (`%LOCALAPPDATA%\Programs\RawAccel` if the setup installed it).
 
 ---
 

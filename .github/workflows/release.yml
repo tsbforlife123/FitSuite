@@ -1,7 +1,8 @@
 # Builds and tests FitSuite on every push to main, and publishes a GitHub release (tag v<version>,
 # created by GitHub) the first time a new version number from CMakeLists.txt reaches main.
 # FitSuite's updater reads the latest release and needs two of its files: FitSuite.exe and
-# FitSuite.exe.sha256 (published together, checked before use).
+# FitSuite.exe.sha256 (published together, checked before use). Players download FitSuite-Setup.exe
+# (the installer) or FitSuite.zip (portable). Release titles are just the version number.
 name: release
 
 on:
@@ -42,7 +43,7 @@ jobs:
           version="$(sed -n 's/^project(FitSuite VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
           echo "VERSION=${version}" >> "$GITHUB_ENV"
           tools/package.sh
-          cp "dist/FitSuite-${version}-preview-win64/FitSuite.exe" dist/FitSuite.exe
+          cp dist/FitSuite/FitSuite.exe dist/FitSuite.exe
           (cd dist && sha256sum FitSuite.exe > FitSuite.exe.sha256 && cat FitSuite.exe.sha256)
 
       - name: Publish release (new versions only)
@@ -55,5 +56,5 @@ jobs:
           fi
           notes="docs/releases/${tag}.md"
           [ -f "$notes" ] || notes=/dev/null
-          gh release create "$tag" dist/FitSuite-*-win64.zip dist/FitSuite.exe dist/FitSuite.exe.sha256 \
-            --target "$GITHUB_SHA" --title "FitSuite ${VERSION} (preview)" --notes-file "$notes"
+          gh release create "$tag" dist/FitSuite-Setup.exe dist/FitSuite.zip dist/FitSuite.exe dist/FitSuite.exe.sha256 \
+            --target "$GITHUB_SHA" --title "${VERSION}" --notes-file "$notes"

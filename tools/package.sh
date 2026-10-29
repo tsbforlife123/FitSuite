@@ -1,25 +1,26 @@
 #!/usr/bin/env bash
-# Builds the Windows release zip and a source zip into dist/.
+# Builds the Windows installer (FitSuite-Setup.exe), the portable zip (FitSuite.zip) and a source zip
+# into dist/. File names carry no version number: the version is in the release notes.
 #   tools/package.sh                # uses an existing build-win/FitSuite.exe, or builds it
 # Needs: cmake, ninja, llvm-mingw (LLVM_MINGW, default /opt/llvm-mingw), zip.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$root"
-version="$(sed -n 's/^project(FitSuite VERSION \([0-9.]*\).*/\1/p' CMakeLists.txt)"
-name="FitSuite-${version}-preview"
+name="FitSuite"
 LLVM_MINGW="${LLVM_MINGW:-/opt/llvm-mingw}"
 
-if [ ! -f build-win/FitSuite.exe ] || [ "${REBUILD:-0}" = "1" ]; then
+if [ ! -f build-win/FitSuite.exe ] || [ ! -f build-win/FitSuite-Setup.exe ] || [ "${REBUILD:-0}" = "1" ]; then
   PATH="$LLVM_MINGW/bin:$PATH" cmake -S . -B build-win -G Ninja -DCMAKE_TOOLCHAIN_FILE=cmake/llvm-mingw-x86_64.cmake \
     -DCMAKE_BUILD_TYPE=Release -DFITSUITE_BUILD_APP=ON -DFITSUITE_BUILD_TESTS=OFF
   PATH="$LLVM_MINGW/bin:$PATH" cmake --build build-win
 fi
 
-stage="dist/${name}-win64"
-rm -rf "$stage" "dist/${name}-win64.zip" "dist/${name}-source.zip"
+stage="dist/${name}"
+rm -rf "$stage" "dist/${name}.zip" "dist/${name}-source.zip" "dist/FitSuite-Setup.exe"
 mkdir -p "$stage/docs" "$stage/tools"
+# Both are linked without debug symbols (-s), so the FitSuite.exe here is the one inside the installer.
 cp build-win/FitSuite.exe "$stage/"
-"$LLVM_MINGW/bin/llvm-strip" "$stage/FitSuite.exe" 2>/dev/null || true
+cp build-win/FitSuite-Setup.exe dist/FitSuite-Setup.exe
 cp packaging/README.txt "$stage/README.txt"
 cp docs/MEASUREMENTS.md docs/MILESTONES.md "$stage/docs/"
 printf 'Put PresentMon-2.x.x-x64.exe (github.com/GameTechDev/PresentMon/releases) in this folder.\r\n' > "$stage/tools/PUT-PRESENTMON-HERE.txt"
@@ -49,7 +50,7 @@ printf 'Put PresentMon-2.x.x-x64.exe (github.com/GameTechDev/PresentMon/releases
 } | sed 's/$/\r/' > "$stage/THIRD_PARTY_NOTICES.txt"
 sed -i 's/$/\r/' "$stage/README.txt"
 
-(cd dist && zip -qr "${name}-win64.zip" "${name}-win64")
+(cd dist && zip -qr "${name}.zip" "${name}")
 
 # Source archive (no build output).
 src="dist/${name}-source"
@@ -61,4 +62,4 @@ done
 (cd dist && zip -qr "${name}-source.zip" "${name}-source")
 rm -rf "$src"
 
-ls -la dist/*.zip
+ls -la dist/*.zip dist/FitSuite-Setup.exe

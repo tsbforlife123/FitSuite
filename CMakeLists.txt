@@ -128,7 +128,8 @@ if(FITSUITE_BUILD_APP)
   target_link_libraries(FitSuite PRIVATE fitapp d3d11 dxgi d3dcompiler dxva2 setupapi hid cfgmgr32 shell32 ole32 dwmapi winhttp
                                          winmm comdlg32 advapi32 user32 gdi32 version)
   if(MINGW)
-    target_link_options(FitSuite PRIVATE -static -municode)
+    # -s: no debug symbols, so the FitSuite.exe inside the installer is the published one.
+    target_link_options(FitSuite PRIVATE -static -municode -s)
   endif()
   if(NOT MSVC)
     # Win32 structs are routinely initialised as {sizeof s}; that is intended.
@@ -136,6 +137,28 @@ if(FITSUITE_BUILD_APP)
   else()
     # fitsuite.rc embeds its own manifest (DPI awareness, UTF-8, common controls).
     target_link_options(FitSuite PRIVATE /MANIFEST:NO)
+  endif()
+
+  # ---- installer: FitSuite-Setup.exe carries FitSuite.exe (resource 2) and installs it for the
+  # current Windows account. Built after FitSuite.exe, which it embeds.
+  set(SETUP_RC ${CMAKE_CURRENT_BINARY_DIR}/setup_payload.rc)
+  set(FITSUITE_EXE_BUILT ${CMAKE_CURRENT_BINARY_DIR}/FitSuite.exe)
+  file(WRITE ${SETUP_RC}
+    "#include <windows.h>\n"
+    "1 ICON \"${CMAKE_CURRENT_SOURCE_DIR}/assets/icon/fitsuite.ico\"\n"
+    "1 RT_MANIFEST \"${CMAKE_CURRENT_SOURCE_DIR}/platform/win32/fitsuite.manifest\"\n"
+    "2 RCDATA \"${FITSUITE_EXE_BUILT}\"\n")
+  set_source_files_properties(${SETUP_RC} PROPERTIES OBJECT_DEPENDS ${FITSUITE_EXE_BUILT})
+  add_executable(FitSuiteSetup WIN32 platform/win32/setup_win32.cpp ${SETUP_RC})
+  set_target_properties(FitSuiteSetup PROPERTIES OUTPUT_NAME FitSuite-Setup)
+  add_dependencies(FitSuiteSetup FitSuite)
+  target_include_directories(FitSuiteSetup PRIVATE platform/win32)
+  target_compile_definitions(FitSuiteSetup PRIVATE UNICODE _UNICODE NOMINMAX _WIN32_WINNT=0x0A00)
+  target_link_libraries(FitSuiteSetup PRIVATE ole32 shell32 uuid comctl32 advapi32 user32 gdi32)
+  if(MINGW)
+    target_link_options(FitSuiteSetup PRIVATE -static -municode -s)
+  else()
+    target_link_options(FitSuiteSetup PRIVATE /MANIFEST:NO)
   endif()
 endif()
 

@@ -43,6 +43,10 @@ struct ReleaseInfo {
     std::string sha_url;      // FitSuite.exe.sha256
     long long exe_size = 0;
     bool prerelease = false;
+    // The version as players see it: "1.0.0" (no "v", no "FitSuite").
+    std::string version_text() const {
+        return std::to_string(version.major) + "." + std::to_string(version.minor) + "." + std::to_string(version.patch);
+    }
 };
 
 // GitHub's "latest release" JSON. nullopt (with *error) when it is not usable.

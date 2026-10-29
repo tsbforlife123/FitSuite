@@ -201,4 +201,77 @@ std::optional<RawAccelPatchResult> patch_rawaccel_settings(std::string_view text
     return r;
 }
 
+std::string default_rawaccel_settings_json() {
+    // Field names and values from Raw Accel 1.7.1 (wrapper/wrapper.cpp, common/rawaccel-base.hpp).
+    static const char* const accel = R"RA({
+      "mode": "noaccel",
+      "Gain / Velocity": true,
+      "inputOffset": 0.0,
+      "outputOffset": 0.0,
+      "acceleration": 0.005,
+      "decayRate": 0.1,
+      "gamma": 1.0,
+      "motivity": 1.5,
+      "exponentClassic": 2.0,
+      "scale": 1.0,
+      "exponentPower": 0.05,
+      "limit": 1.5,
+      "syncSpeed": 5.0,
+      "smooth": 0.5,
+      "Cap / Jump": {
+        "x": 15.0,
+        "y": 1.5
+      },
+      "Cap mode": "output",
+      "data": []
+    })RA";
+    std::string j = R"RA({
+  "### Accel modes ###": "classic | jump | natural | synchronous | power | lut | noaccel",
+  "### Cap modes ###": "in_out | input | output",
+  "version": "1.7.1",
+  "defaultDeviceConfig": {
+    "disable": false,
+    "Use constant time interval based on polling rate": false,
+    "DPI (normalizes input speed unit: counts/ms -> in/s)": 0,
+    "Polling rate Hz (keep at 0 for automatic adjustment)": 0
+  },
+  "profiles": [
+    {
+      "name": "default",
+      "Stretches domain for horizontal vs vertical inputs": {
+        "x": 1.0,
+        "y": 1.0
+      },
+      "Stretches accel range for horizontal vs vertical inputs": {
+        "x": 1.0,
+        "y": 1.0
+      },
+      "Whole or horizontal accel parameters": )RA";
+    j += accel;
+    j += R"RA(,
+      "Vertical accel parameters": )RA";
+    j += accel;
+    j += R"RA(,
+      "Input speed calculation parameters": {
+        "Whole/combined accel (set false for 'by component' mode)": true,
+        "lpNorm": 2.0,
+        "Time in ms after which an input is weighted at half its original value.": 0.0,
+        "Time in ms after which scale is weighted at half its original value.": 0.0,
+        "Time in ms after which an output is weighted at half its original value.": 0.0
+      },
+      "Output DPI": 1000.0,
+      "Y/X output DPI ratio (vertical sens multiplier)": 1.0,
+      "L/R output DPI ratio (left sens multiplier)": 1.0,
+      "U/D output DPI ratio (up sens multiplier)": 1.0,
+      "Degrees of rotation": 0.0,
+      "Degrees of angle snapping": 0.0,
+      "Input Speed Cap": 0.0
+    }
+  ],
+  "devices": []
+}
+)RA";
+    return j;
+}
+
 }  // namespace fit

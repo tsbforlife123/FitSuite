@@ -7,6 +7,7 @@
 //   MotionTest vsync, exactly one new frame per refresh; refreshes that repeated an old frame are
 //              counted from DXGI frame statistics so the test can discard disturbed trials.
 #include "win32_platform.hpp"
+#include "install_paths.hpp"
 
 #include <d3d11.h>
 #include <dwmapi.h>
@@ -18,6 +19,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <filesystem>
 #include <fstream>
 
 #include "app.hpp"
@@ -470,12 +472,65 @@ void fatal(const std::string& text) {
     MessageBoxW(nullptr, fitapp::win32::widen(text).c_str(), L"FitSuite", MB_ICONERROR | MB_OK);
 }
 
+// "FitSuite.exe --uninstall", from Windows Settings → Apps (added by FitSuite-Setup.exe). Asks first,
+// closes a running FitSuite (which puts the player's own Raw Accel settings back), removes the startup
+// entry, the shortcuts and the Apps entry, asks whether to delete the measurements too, and removes
+// FitSuite.exe once this copy has closed. Only FitSuite's own files are removed: its folder is
+// deleted only if nothing else is left in it.
+int run_uninstall() {
+    using namespace fitinstall;
+    if (MessageBoxW(nullptr,
+                    L"Remove FitSuite from this PC?\n\nRaw Accel stays installed with your own settings (it has its own "
+                    L"uninstaller, in Windows Settings > Apps).",
+                    L"Uninstall FitSuite", MB_YESNO | MB_ICONQUESTION | MB_DEFBUTTON2) != IDYES)
+        return 0;
+    if (!close_running_fitsuite(15000)) {
+        MessageBoxW(nullptr, L"FitSuite is still open. Quit it (right-click its icon next to the clock, then Quit FitSuite) and try again.",
+                    L"Uninstall FitSuite", MB_ICONWARNING | MB_OK);
+        return 1;
+    }
+    RegDeleteKeyValueW(HKEY_CURRENT_USER, kRunKey, kRunValue);
+    RegDeleteKeyValueW(HKEY_CURRENT_USER, kApprovedKey, kRunValue);
+    DeleteFileW(start_menu_shortcut().c_str());
+    DeleteFileW(desktop_shortcut().c_str());
+    RegDeleteTreeW(HKEY_CURRENT_USER, kUninstallKey);
+
+    wchar_t self[MAX_PATH];
+    const DWORD n = GetModuleFileNameW(nullptr, self, MAX_PATH);
+    const std::wstring exe(self, n);
+    const std::wstring dir = exe.substr(0, exe.find_last_of(L'\\'));
+    // Same choice as the app: a FitSuiteData folder next to the program, else %LOCALAPPDATA%\FitSuite.
+    std::wstring data = dir + L"\\FitSuiteData";
+    if (GetFileAttributesW(data.c_str()) == INVALID_FILE_ATTRIBUTES) data = known_folder(FOLDERID_LocalAppData) + L"\\FitSuite";
+    if (GetFileAttributesW(data.c_str()) != INVALID_FILE_ATTRIBUTES &&
+        MessageBoxW(nullptr,
+                    (L"Also delete your measurements, fixes and settings?\n\n" + data +
+                     L"\n\nChoose No to keep them for a later install.").c_str(),
+                    L"Uninstall FitSuite", MB_YESNO | MB_ICONWARNING | MB_DEFBUTTON2) == IDYES) {
+        std::error_code ec;
+        std::filesystem::remove_all(std::filesystem::path(data), ec);
+    }
+    MessageBoxW(nullptr, L"FitSuite was removed.", L"Uninstall FitSuite", MB_ICONINFORMATION | MB_OK);
+    // This program cannot delete itself while it runs: a hidden command does it two seconds after it
+    // has closed.
+    std::wstring cmd = L"cmd.exe /d /c ping -n 3 127.0.0.1 >nul & del /f /q \"" + exe + L"\" \"" + exe + L".old\" & rmdir \"" + dir + L"\"";
+    STARTUPINFOW si{};
+    si.cb = sizeof si;
+    PROCESS_INFORMATION pi{};
+    if (CreateProcessW(nullptr, cmd.data(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, &pi)) {
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+    }
+    return 0;
+}
+
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR cmdline, int show) {
     // "--autostart": started by the Windows startup entry (Settings → Open FitSuite when Windows
     // starts). "--background" is the same entry from an earlier preview.
     const std::wstring args = cmdline ? std::wstring(cmdline) : std::wstring();
+    if (args.find(L"--uninstall") != std::wstring::npos) return run_uninstall();
     const bool autostart = args.find(L"--autostart") != std::wstring::npos || args.find(L"--background") != std::wstring::npos;
 
     // "--updated": started by the previous version right after it replaced FitSuite.exe. It is still

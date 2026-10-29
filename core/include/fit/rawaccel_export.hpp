@@ -1,8 +1,9 @@
 // Export of a Raw Accel-compatible MouseFit profile.
 //
-// FitSuite never installs or configures Raw Accel itself. It shows the values to enter in Raw Accel's
-// GUI, or writes a *new* settings file derived from the user's own Raw Accel settings.json (the
-// original is never modified). Because FitSuite reads raw input *after* any active Raw Accel
+// FitSuite writes a *new* settings file derived from the user's own Raw Accel settings.json and
+// applies it with Raw Accel's own writer.exe. When Raw Accel has not saved a settings.json yet,
+// FitSuite writes Raw Accel's default one (default_rawaccel_settings_json()) so the fix can be used
+// without opening Raw Accel first. Because FitSuite reads raw input *after* any active Raw Accel
 // processing, a calibration made with Raw Accel active measured "your current Raw Accel settings";
 // the export therefore composes the correction with the existing values.
 #pragma once
@@ -42,5 +43,9 @@ struct RawAccelPatchResult {
 // Raw Accel settings file or a required field is missing.
 std::optional<RawAccelPatchResult> patch_rawaccel_settings(std::string_view settings_json, const RawAccelProfile& correction,
                                                            const std::string& profile_name, std::string* error);
+
+// The settings.json Raw Accel 1.7.1 writes for its defaults (DriverConfig.GetDefault().ToJSON() in
+// its source): one "default" profile, no acceleration, 1000 output DPI, every ratio 1.
+std::string default_rawaccel_settings_json();
 
 }  // namespace fit

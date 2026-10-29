@@ -3,6 +3,7 @@
 #include <sstream>
 
 #include "app.hpp"
+#include "fit/rawaccel_export.hpp"
 #include "fit/sha256.hpp"
 #include "fit/store.hpp"
 #include "fit/timeutil.hpp"
@@ -56,6 +57,37 @@ fs::path App::rawaccel_folder() {
         remember_rawaccel_settings_path(found / "settings.json");
     rawaccel_folder_cache_ = found;
     return found;
+}
+
+fs::path App::rawaccel_settings_ready(std::string* note) {
+    fs::path sj = rawaccel_settings_path();
+    if (!sj.empty()) return sj;
+    rawaccel_folder_checked_at_ = -100.0;
+    const fs::path dir = rawaccel_folder();  // also remembers a settings.json Raw Accel already saved
+    sj = rawaccel_settings_path();
+    if (!sj.empty() || dir.empty()) return sj;
+    const fs::path p = dir / "settings.json";
+    std::error_code ec;
+    if (!fs::exists(p, ec)) {
+        std::string err;
+        if (!atomic_write_file(p, default_rawaccel_settings_json(), &err)) {
+            if (note) *note = "Could not write Raw Accel's settings file in " + dir.string() + ": " + err;
+            return {};
+        }
+        AppliedChange ch;
+        ch.id = make_id("ch");
+        ch.kind = "rawaccel.settings_created";
+        ch.target = p.string();
+        ch.before = "no settings.json (Raw Accel had not saved one yet)";
+        ch.after = "Raw Accel's default settings";
+        ch.applied_utc = utc_now_iso();
+        ch.status = "applied";
+        setup_.applied_changes.push_back(std::move(ch));
+        save();
+        if (note) *note = "Raw Accel had no settings file yet, so FitSuite wrote Raw Accel's default one.";
+    }
+    remember_rawaccel_settings_path(p);
+    return p;
 }
 
 bool App::rawaccel_needs_vc_runtime() { return !platform_.vc_runtime_installed(); }
@@ -200,7 +232,7 @@ std::string App::take_update_notice() {
     if (setup_.app.update_notified == updater.release->tag) return "";
     setup_.app.update_notified = updater.release->tag;
     save();
-    return "FitSuite " + updater.release->tag + " is available. Open FitSuite, then Settings → Updates to install it.";
+    return "FitSuite version " + updater.release->version_text() + " is available. Open FitSuite to update.";
 }
 
 void App::tick_updater() {
@@ -237,7 +269,7 @@ void App::tick_updater() {
         if (compare_versions(rel->version, parse_version(kAppVersion)) > 0) {
             u.step = Updater::Step::Available;
             // Normally the "Update available" box asks; during the first-run setup a short note does.
-            if (!setup_.app.setup_done) toast(ui::Tone::Info, "FitSuite " + rel->tag + " is available: Settings → Updates.", 10.0);
+            if (!setup_.app.setup_done) toast(ui::Tone::Info, "Version " + rel->version_text() + " is available: Settings → Updates.", 10.0);
         } else {
             u.step = Updater::Step::UpToDate;
         }
@@ -290,7 +322,7 @@ void App::tick_updater() {
 void App::draw_update_prompt() {
     auto& u = updater;
     if (!setup_.app.setup_done || u.prompt_dismissed || !u.release || mouse.test || motion.test) return;
-    if ((setup_.app.notes_seen != kAppVersion && *kReleaseNotes) || whats_new_open_) return;  // "What's new" first
+    if (whats_new_showing()) return;  // "What's new" first
     const bool working = u.install_when_ready;  // the player clicked Update
     if (!working && u.step != Updater::Step::Available) return;
     if (working && u.step == Updater::Step::Ready) {
@@ -306,7 +338,7 @@ void App::draw_update_prompt() {
     ImGui::Begin("Update available", nullptr,
                  ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
                      ImGuiWindowFlags_NoMove);
-    ui::wrapped(ui::fmt("FitSuite %s is available. You have %s.", u.release->tag.c_str(), kAppVersion).c_str());
+    ui::wrapped(ui::fmt("Version %s is available. You have version %s.", u.release->version_text().c_str(), kAppVersion).c_str());
     if (!u.release->notes.empty()) {
         std::string notes = u.release->notes;
         if (notes.size() > 500) notes = notes.substr(0, 500) + "…";
@@ -348,35 +380,49 @@ static std::string plain_notes(const char* md) {
     return out;
 }
 
-// "What's new in FitSuite x.y.z", shown once, the first time a new version opens after an update,
-// and again whenever the player clicks "What's new" in the status bar. New players do not get it by
-// themselves (finishing the setup counts as seen).
+// "What's new": this version's notes, shown each time FitSuite opens (once the setup is done) until
+// the player clicks "Don't show again". That lasts until the next update, whose notes show again.
+// "What's new" in the status bar opens it any time.
+bool App::whats_new_showing() {
+    if (!*kReleaseNotes || mouse.test || motion.test) return false;
+    if (whats_new_open_) return true;
+    return setup_.app.setup_done && !whats_new_closed_ && setup_.app.notes_hidden != kAppVersion;
+}
+
 void App::draw_whats_new() {
-    if (!*kReleaseNotes || mouse.test || motion.test) return;
-    const bool after_update = setup_.app.setup_done && setup_.app.notes_seen != kAppVersion;
-    if (!after_update && !whats_new_open_) return;
+    if (!whats_new_showing()) return;
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(ImVec2(vp->Pos.x + vp->Size.x * 0.5f, vp->Pos.y + vp->Size.y * 0.5f), ImGuiCond_Always,
                             ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowSize(ImVec2(520, 0));
-    const std::string title = std::string("What's new in FitSuite ") + kAppVersion;
+    const std::string title = std::string("What's new in version ") + kAppVersion;
     ImGui::Begin(title.c_str(), nullptr,
                  ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
                      ImGuiWindowFlags_NoMove);
     ui::wrapped(plain_notes(kReleaseNotes).c_str());
     ImGui::Spacing();
-    if (ui::button_primary("Got it")) {
+    if (ui::button_primary("Close")) {
         whats_new_open_ = false;
-        if (after_update) {
-            setup_.app.notes_seen = kAppVersion;
+        whats_new_closed_ = true;
+    }
+    if (setup_.app.notes_hidden != kAppVersion) {
+        ImGui::SameLine(0, 12);
+        if (ui::button_secondary("Don't show again")) {
+            whats_new_open_ = false;
+            whats_new_closed_ = true;
+            setup_.app.notes_hidden = kAppVersion;
             save_now();
         }
     }
+    ImGui::Dummy(ImVec2(0, 2));
+    ui::faint(setup_.app.notes_hidden == kAppVersion
+                  ? "Hidden until the next update. \"What's new\" in the bottom-right corner opens it any time."
+                  : "Shown each time FitSuite opens until you click \"Don't show again\".");
     ImGui::End();
 }
 
 void App::finish_setup() {
-    setup_.app.notes_seen = kAppVersion;  // a new player has nothing to catch up on
+    whats_new_closed_ = true;  // not straight after the setup: from the next time FitSuite opens
     setup_.app.setup_done = true;
     setup_.app.setup_step = 0;
     save_now();

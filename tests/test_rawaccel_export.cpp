@@ -113,3 +113,30 @@ TEST_CASE("a speed curve is written as Raw Accel's lookup table in sensitivity m
     for (const auto& w : r->warnings) said = said || w.find("speed part") != std::string::npos;
     CHECK(said);
 }
+
+TEST_CASE("Raw Accel's default settings: complete, accepted, and the fix goes into them") {
+    const json d = json::parse(default_rawaccel_settings_json());
+    REQUIRE(d["profiles"].size() == 1);
+    const json& p = d["profiles"][0];
+    // Raw Accel refuses a file that misses any of these (Required::Always in its source).
+    for (const char* k : {"name", "Stretches domain for horizontal vs vertical inputs", "Stretches accel range for horizontal vs vertical inputs",
+                          "Whole or horizontal accel parameters", "Vertical accel parameters", "Input speed calculation parameters",
+                          "Output DPI", "Y/X output DPI ratio (vertical sens multiplier)", "L/R output DPI ratio (left sens multiplier)",
+                          "U/D output DPI ratio (up sens multiplier)", "Degrees of rotation", "Degrees of angle snapping", "Input Speed Cap"})
+        CHECK_MESSAGE(p.contains(k), k);
+    for (const char* k : {"version", "defaultDeviceConfig", "profiles", "devices"}) CHECK_MESSAGE(d.contains(k), k);
+    CHECK(p["Whole or horizontal accel parameters"]["mode"] == "noaccel");
+    CHECK(p["Output DPI"].get<double>() == 1000.0);
+
+    RawAccelProfile c;
+    c.yx_ratio = 1.04;
+    c.rotation_deg = 2.0;
+    c.sens = 0.98;
+    std::string err;
+    auto r = patch_rawaccel_settings(default_rawaccel_settings_json(), c, "", &err);
+    REQUIRE_MESSAGE(r, err);
+    CHECK(r->warnings.empty());
+    const json out = json::parse(r->json);
+    CHECK(out["profiles"][0]["Output DPI"].get<double>() == doctest::Approx(980).epsilon(1e-3));
+    CHECK(out["profiles"][0]["Degrees of rotation"].get<double>() == doctest::Approx(2.0).epsilon(1e-3));
+}

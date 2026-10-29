@@ -192,11 +192,12 @@ struct AppSettings {
     int setup_step = 0;                  // where the setup continues (e.g. after the restart Raw Accel needs)
     std::string rawaccel_folder;         // where the setup unpacked Raw Accel
     bool rawaccel_install_pending = false;  // its installer ran; the driver appears after a restart
-    // Updates: checked once a day when switched on (FitSuite's public GitHub releases).
+    // Updates: checked automatically (on by default) each time FitSuite opens and once a day while it
+    // runs (FitSuite's public GitHub releases).
     bool update_check = true;
     std::string last_update_check_utc;
     std::string update_notified;         // version the player was last told about
-    std::string notes_seen;              // version whose "What's new" notes the player has seen
+    std::string notes_hidden;            // version whose "What's new" box the player chose not to show again
 };
 
 struct SetupProfile {

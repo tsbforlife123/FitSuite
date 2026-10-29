@@ -27,7 +27,7 @@ TEST_CASE("versions compare numerically") {
 
 TEST_CASE("a GitHub release is read, and one without the program or its checksum is refused") {
     const std::string ok = R"({"tag_name":"v0.3.0","name":"FitSuite 0.3.0","body":"Faster rounds.","published_at":"2026-11-01T10:00:00Z",
-        "prerelease":false,"assets":[{"name":"FitSuite-0.3.0-preview-win64.zip","browser_download_url":"https://example.com/a.zip","size":1},
+        "prerelease":false,"assets":[{"name":"FitSuite.zip","browser_download_url":"https://example.com/a.zip","size":1},
         {"name":"FitSuite.exe","browser_download_url":"https://github.com/x/y/releases/download/v0.3.0/FitSuite.exe","size":8000000},
         {"name":"FitSuite.exe.sha256","browser_download_url":"https://github.com/x/y/releases/download/v0.3.0/FitSuite.exe.sha256","size":80}]})";
     std::string err;
