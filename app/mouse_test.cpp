@@ -564,15 +564,22 @@ void MouseTest::draw_hud(ImDrawList* dl, ImVec2 o, ImVec2 s, int64_t now) {
     ui::push_font(fonts().medium, kBody);
     const std::string title = std::string(name) + " · " + round_title(round_);
     dl->AddText(ImVec2(o.x + 24, o.y + 18), rgb(kSceneText), title.c_str());
+    // Progress only, no score: this measures how you aim, it is not a points game. (The aim report
+    // afterwards has the numbers.)
     std::string line;
-    if (phase_ == Phase::Playing && info().task == Task::Track) {
-        const double left = std::max(0.0, info().duration_ms / 1000.0 - double(tk_played_us_) / 1e6);
-        line = ui::fmt("%.0f s left · on target %.0f%%", std::ceil(left), tk_total_s_ > 0 ? 100.0 * tk_on_s_ / tk_total_s_ : 0.0);
-    } else {
-        line = ui::fmt("Hits %d · Misses %d", hits_, misses_);
-        if (hits_ + misses_ > 0) line += ui::fmt(" · %.0f%%", 100.0 * hits_ / (hits_ + misses_));
+    if (phase_ == Phase::Playing) {
+        const Task task = info().task;
+        if (task == Task::Track) {
+            const double left = std::max(0.0, info().duration_ms / 1000.0 - double(tk_played_us_) / 1e6);
+            line = ui::fmt("%.0f s left", std::ceil(left));
+        } else if (task == Task::Switch) {
+            line = ui::fmt("Target %d of %d", std::min(sw_resolved_ + 1, info().kills), info().kills);
+        } else {
+            const size_t n = specs().size();
+            line = ui::fmt("Target %d of %d", int(std::min(spec_pos_ + 1, n)), int(n));
+        }
     }
-    dl->AddText(ImVec2(o.x + 24, o.y + 40), rgb(kSceneFaint), line.c_str());
+    if (!line.empty()) dl->AddText(ImVec2(o.x + 24, o.y + 40), rgb(kSceneFaint), line.c_str());
     const char* esc = "Esc  stop test";
     const ImVec2 es = ImGui::CalcTextSize(esc);
     dl->AddText(ImVec2(o.x + s.x - es.x - 24, o.y + 18), rgb(kSceneMuted), esc);
@@ -708,9 +715,10 @@ void MouseTest::frame(ImVec2 origin, ImVec2 size) {
                                 "each round. One shot per target; a miss makes it disappear. Esc stops; leaving the "
                                 "window pauses.",
                                 round_count(), length.c_str())
-                : cal ? ui::fmt("%d short rounds (%s): flicks, micro-adjustments, tracking and target switching. Click to "
-                                "start each round. One shot per target: a miss makes it disappear, and every target has a "
-                                "timer. Play like you do in game. Esc stops; leaving the window pauses.",
+                : cal ? ui::fmt("%d short rounds (%s): flicks, micro-adjustments, tracking and target switching. There is "
+                                "no score: FitSuite measures how your flicks land and move. Click to start each round. One "
+                                "shot per target: a miss makes it disappear, and every target has a timer. Play like you do "
+                                "in game. Esc stops; leaving the window pauses.",
                                 round_count(), length.c_str())
                       : ui::fmt("%d blocks (%s). Some use your current setup and some the fix, in a hidden order. Play "
                                 "every block the same way. A short warm-up comes first and is not scored.",
