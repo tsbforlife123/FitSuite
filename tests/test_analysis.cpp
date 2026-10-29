@@ -62,6 +62,64 @@ GameMapping mapping() {
 
 }  // namespace
 
+TEST_CASE("the first flick's path: curve and straightness") {
+    const Vec2 target{400, 0};  // a flick to the right
+    // Straight flick.
+    const auto straight = analyze_trial(make_trial(target, {380, 0}, 220, 180, 120, 150), mapping());
+    REQUIRE(straight.valid);
+    CHECK(std::fabs(straight.curve_pct) < 1.0);
+    CHECK(straight.straightness_pct > 99.0);
+
+    // The same flick, bowing upward (to the left, looking along it) by 8% of its length in the middle.
+    auto curved_trial = [&](double bow) {
+        Trial tr;
+        tr.spec.dir_deg = 0;
+        tr.spec.dist_deg = 10;
+        tr.spec.radius_deg = 0.5;
+        tr.target_counts = target;
+        tr.t_appear_us = 1'000'000;
+        tr.outcome = TrialOutcome::Hit;
+        int64_t t = tr.t_appear_us + 220'000;
+        Vec2 done{};
+        const Vec2 end{380, 0};
+        for (int i = 1; i <= 180; ++i) {  // 180 ms at 1 ms per report
+            const double s = mj(i / 180.0);
+            const Vec2 want = end * s + Vec2{0.0, -bow * length(end) * 4.0 * s * (1.0 - s)};  // raw −y = up
+            const int dx = int(std::lround(want.x - done.x)), dy = int(std::lround(want.y - done.y));
+            t += 1000;
+            done += Vec2{double(dx), double(dy)};
+            if (dx || dy) tr.motion.push_back({t, dx, dy, double(dx), double(dy)});
+        }
+        t += 120'000;
+        const Vec2 from = done;
+        for (int i = 1; i <= 150; ++i) {  // a slow correction to the target over 150 ms
+            const Vec2 want = from + (target - from) * mj(i / 150.0);
+            const int dx = int(std::lround(want.x - done.x)), dy = int(std::lround(want.y - done.y));
+            t += 1000;
+            done += Vec2{double(dx), double(dy)};
+            if (dx || dy) tr.motion.push_back({t, dx, dy, double(dx), double(dy)});
+        }
+        t += 60'000;
+        tr.clicks.push_back({t, true, 0.1});
+        tr.t_end_us = t;
+        return tr;
+    };
+    const auto left = analyze_trial(curved_trial(0.08), mapping());
+    REQUIRE(left.valid);
+    MESSAGE("curve " << left.curve_pct << " %, straightness " << left.straightness_pct << " %");
+    CHECK(left.curve_pct == doctest::Approx(8.0).epsilon(0.15));
+    CHECK(left.straightness_pct < straight.straightness_pct);
+    const auto right = analyze_trial(curved_trial(-0.08), mapping());
+    REQUIRE(right.valid);
+    CHECK(right.curve_pct == doctest::Approx(-8.0).epsilon(0.15));
+
+    // Per direction: the summary averages it.
+    std::vector<TrialMetrics> ms(5, left);
+    const auto dirs = summarize_by_direction(ms, 8);
+    CHECK(dirs[0].n == 5);
+    CHECK(dirs[0].mean_curve_pct == doctest::Approx(left.curve_pct));
+}
+
 TEST_CASE("first-flick undershoot is measured before the correction") {
     const Vec2 target{400, 0};
     const Trial tr = make_trial(target, {368, 0}, 220, 180, 120, 150);  // 92% primary

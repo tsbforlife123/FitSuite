@@ -158,6 +158,14 @@ For each kind of round: targets hit out of targets shown (misses and timeouts co
 time from a target appearing to the hit, and for switching the hits per minute. These are MEASURED values of
 that session, shown for your information; the fix is fitted from the flick, micro and switching flicks only.
 
+**Flick path:** for every first flick (movement onset → end of the first flick), how far the path bows
+sideways from the straight line between its start and end, as % of that line's length (to the left or right as
+you look along the flick), and its straightness (straight-line distance ÷ path length; 100% = straight). The
+report names the direction with the largest average curve when it is at least 3% and at least 2 points more
+than the median direction; otherwise it says the flicks are about equally straight. Nerd stats → Mouse lists
+both per direction. During the test a thin, fading line shows the crosshair's last 0.25 s, so you can see the
+shape of each flick. This is for your information; the fix does not use it (it corrects where the flick ends).
+
 **Tracking:** the share of time the crosshair was on the target or its 0.15 s trail, the average distance from its centre, and how
 far behind the target you stay in each direction it moves. "Behind" is the distance along the target's path ÷
 its speed, as time, taken only while the target has moved steadily for 0.25 s (and not in the first 0.3 s of

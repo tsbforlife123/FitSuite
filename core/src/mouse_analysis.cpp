@@ -244,6 +244,22 @@ TrialMetrics analyze_trial(const Trial& tr, const GameMapping& mapping, const Se
     if (m.endpoint_error_deg <= tr.spec.radius_deg) m.flick_class = FlickClass::OnTarget;
     else m.flick_class = m.radial_ratio > 1.0 ? FlickClass::Overshoot : FlickClass::Undershoot;
 
+    // ---- shape of the first flick's path ------------------------------------------------------
+    // Sideways offset from the straight line start → end, on screen (+ = left of the line, looking
+    // along it), and the path length, from the recorded positions between onset and the flick's end.
+    if (const double len_e = length(e); len_e > 0.0) {
+        const Vec2 ue = e / len_e;
+        double max_off = 0.0, path = 0.0;
+        for (size_t i = i_on; i <= i_end && i < n; ++i) {
+            const Vec2 d = pos[i] - p_on;
+            const double off = d.x * ue.y - d.y * ue.x;  // raw +y is screen down, hence this sign
+            if (std::fabs(off) > std::fabs(max_off)) max_off = off;
+            if (i > i_on) path += length(pos[i] - pos[i - 1]);
+        }
+        m.curve_pct = 100.0 * max_off / len_e;
+        m.straightness_pct = path > 0.0 ? std::min(100.0, 100.0 * len_e / path) : 100.0;
+    }
+
     // ---- validity -----------------------------------------------------------------------------
     // In a switching round every target was already visible, so moving at once is not a guess.
     if (tr.spec.task != Task::Switch && m.reaction_ms < P.anticipation_ms)
@@ -289,10 +305,12 @@ std::vector<DirectionSummary> summarize_by_direction(const std::vector<TrialMetr
     for (int b = 0; b < directions; ++b) {
         DirectionSummary s;
         s.dir_deg = b * step;
-        std::vector<double> re, ae, acq, cor, hits;
+        std::vector<double> re, ae, acq, cor, hits, curve, straight;
         for (const auto* m : bins[size_t(b)]) {
             re.push_back(m->radial_error_pct);
             ae.push_back(m->angle_error_deg);
+            curve.push_back(m->curve_pct);
+            straight.push_back(m->straightness_pct);
             acq.push_back(m->acquisition_ms);
             if (m->hit) cor.push_back(m->correction_ms);
             hits.push_back(m->first_click_hit ? 1.0 : 0.0);
@@ -309,6 +327,8 @@ std::vector<DirectionSummary> summarize_by_direction(const std::vector<TrialMetr
             s.median_acquisition_ms = median(acq);
             s.median_correction_ms = cor.empty() ? 0.0 : median(cor);
             s.first_click_hit_rate = mean(hits);
+            s.mean_curve_pct = mean(curve);
+            s.mean_straightness_pct = mean(straight);
         }
         out.push_back(s);
     }

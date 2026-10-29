@@ -113,6 +113,11 @@ void SceneRenderer::draw_timer(double yaw_deg, double pitch_deg, double radius_d
     dl_->PathStroke(color, 2.5f);
 }
 
+void SceneRenderer::draw_line(double yaw0, double pitch0, double yaw1, double pitch1, ImU32 color, float thickness) {
+    ImVec2 a, b;
+    if (project(direction_from(yaw0, pitch0), a) && project(direction_from(yaw1, pitch1), b)) dl_->AddLine(a, b, color, thickness);
+}
+
 void SceneRenderer::draw_crosshair(ImU32 color) {
     const ImVec2 c(origin_.x + size_.x * 0.5f, origin_.y + size_.y * 0.5f);
     const float gap = 4.0f, len = 7.0f, th = 2.0f;

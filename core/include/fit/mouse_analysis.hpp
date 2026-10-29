@@ -54,6 +54,12 @@ struct TrialMetrics {
     double radial_error_pct = 0.0;  // + overshoot, − undershoot
     double angle_error_deg = 0.0;   // + = endpoint rotated counter-clockwise on screen
     double endpoint_error_deg = 0.0;// distance from endpoint to target centre, game degrees
+    // Shape of the first flick's path (movement onset → end of the first flick).
+    // curve_pct: the furthest the path bows sideways from the straight line between its start and
+    // end, as % of that line's length; + = to the left as you look along the flick (counter-clockwise
+    // on screen), − = to the right. straightness_pct: straight-line distance ÷ path length (100 = straight).
+    double curve_pct = 0.0;
+    double straightness_pct = 100.0;
     FlickClass flick_class = FlickClass::OnTarget;
     PrimaryEndRule end_rule = PrimaryEndRule::None;
     double peak_speed_deg_s = 0.0;
@@ -76,6 +82,8 @@ struct DirectionSummary {
     double median_acquisition_ms = 0.0;
     double median_correction_ms = 0.0;
     double first_click_hit_rate = 0.0;
+    double mean_curve_pct = 0.0;         // + bows left, − bows right (see TrialMetrics::curve_pct)
+    double mean_straightness_pct = 100.0;
     int n_under = 0, n_on = 0, n_over = 0;
 };
 

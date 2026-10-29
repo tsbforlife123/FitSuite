@@ -47,6 +47,12 @@ struct AimReport {
 
 AimReport make_aim_report(const Session& s);
 
+// How the first flicks' paths curve, as one plain line: the direction where they bow furthest from a
+// straight line (named when at least kCurveNotablePct and clearly more than elsewhere), and how
+// straight they are on average. Shown for information; the fix does not use it. "" with too few flicks.
+inline constexpr double kCurveNotablePct = 3.0;
+std::string flick_curve_line(const Session& s);
+
 const char* task_title(Task t);  // "Flicks", "Micro-adjustments", "Target switching", "Tracking"
 
 }  // namespace fit

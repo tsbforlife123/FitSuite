@@ -238,7 +238,8 @@ TEST_CASE("the aim report covers every round and tracking shows a directional la
             CHECK(r.median_time_ms > 150.0);
         }
     }
-    CHECK(rep.lines.size() == 4);
+    REQUIRE(rep.lines.size() == 5);  // flicks, micro, switching, tracking, flick path
+    CHECK(rep.lines.back().rfind("Flick path: ", 0) == 0);
     for (const auto& l : rep.lines) MESSAGE(l);
 
     const TrackingResult even = analyze_tracking(simulate_rounds({}, 78).tracking);

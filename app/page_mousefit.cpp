@@ -440,8 +440,9 @@ void tab_calibrate(App& app) {
     ui::end_card();
 
     ui::begin_card("##mf_table", 0, 0);
-    if (ImGui::BeginTable("##dirs", 7, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_SizingStretchSame)) {
-        for (const char* h : {"Direction", "Flicks", "Distance error", "Repeatability (SD)", "Angle error", "Median time to hit", "First-click hits"})
+    if (ImGui::BeginTable("##dirs", 9, ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_SizingStretchSame)) {
+        for (const char* h : {"Direction", "Flicks", "Distance error", "Repeatability (SD)", "Angle error", "Curve", "Straightness",
+                              "Median time to hit", "First-click hits"})
             ImGui::TableSetupColumn(h);
         ImGui::TableHeadersRow();
         for (int i = 0; i < 8; ++i) {
@@ -458,6 +459,10 @@ void tab_calibrate(App& app) {
             ImGui::Text("%.1f %% / %.1f°", d.sd_radial_error_pct, d.sd_angle_error_deg);
             ImGui::TableNextColumn();
             ImGui::Text("%+.2f°", d.mean_angle_error_deg);
+            ImGui::TableNextColumn();  // + bows left of a straight line, − right
+            if (d.n) ImGui::Text("%.1f %% %s", std::fabs(d.mean_curve_pct), d.mean_curve_pct >= 0 ? "left" : "right");
+            ImGui::TableNextColumn();
+            if (d.n) ImGui::Text("%.0f %%", d.mean_straightness_pct);
             ImGui::TableNextColumn();
             ImGui::Text("%.0f ms", d.median_acquisition_ms);
             ImGui::TableNextColumn();
