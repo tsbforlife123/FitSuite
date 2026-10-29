@@ -23,10 +23,10 @@ UPDATES
 HOW IT WORKS
   One plain window with tabs, like Raw Accel, in light or dark. The Mouse tab has everything
   for the mouse fix on one screen: enter your DPI and VALORANT sensitivity, then
-  1 Measure your flicks (five short rounds, about 4 minutes: flicks, micro-adjustments,
+  1 Measure and fix (five short rounds, about 4 minutes: flicks, micro-adjustments,
   tracking, target switching; click to start each round, targets keep coming, one shot
-  each, every target has a timer), 2 Your fix, 3 Blind test (about 2 minutes),
-  4 Use it in your games, 5 Check your fix (a one-minute quick check).
+  each, every target has a timer), then your fix and its blind test (about 2 minutes),
+  and 2 Use it in your games. The one-minute quick check is in Settings.
   History lists every change with a way back. Nerd stats has every number, chart and
   advanced control. Settings has the options below. The status bar at the bottom shows
   whether the fix is on.
@@ -68,7 +68,7 @@ FRAMEFIT NEEDS PRESENTMON (free, from Intel)
 USING A MOUSEFIT CORRECTION IN GAMES
   Only "Raw Accel-compatible" corrections (rotation plus separate up/down/left/right
   sensitivity) can be used outside FitSuite, through the free Raw Accel driver.
-  Mouse tab, "4 Use it in your games": tick your games (VALORANT is ticked; any running
+  Mouse tab, "2 Use it in your games": tick your games (VALORANT is ticked; any running
   game can be added) and click "Turn on". FitSuite then switches Raw Accel to your
   settings plus the fix while one of those games is in front, and back to your own
   settings for everything else. It only reads the name of the program in front; it

@@ -341,6 +341,20 @@ void App::on_mouse_test_done() {
         toast(r.ok ? ui::Tone::Good : ui::Tone::Warn,
               setup_.mouse_profiles.size() > before ? "Calibration analysed: candidate correction ready."
                                                     : "Calibration analysed.");
+        // A fix found by a full calibration goes straight to its blind test (its first screen has Start
+        // and Cancel, so the player can still do it later from the Mouse tab).
+        if (mouse.calibration->complete && r.ok && r.raw_accel_recommended) {
+            std::string fix_id;
+            for (const auto& m : setup_.mouse_profiles)
+                if (m.calibration_session == mouse.calibration->id && m.transform.kind == TransformKind::RawAccel) fix_id = m.id;
+            if (!fix_id.empty()) {
+                save();
+                start_validation(fix_id);
+                if (mouse.test)
+                    toast(ui::Tone::Info, "Your flicks need a fix. The blind test now checks that it really makes you faster.", 8.0);
+                return;
+            }
+        }
     } else if (s.kind == SessionKind::Check) {
         // Compare with what the fix's own calibration predicts for flicks with the fix in use.
         DirectionalProfile expected;
@@ -391,8 +405,31 @@ void App::on_mouse_test_done() {
             m->validation = v;
         }
         record_result("mousefit", "validation", mouse.comparison->explanation, s.conditions.data_origin);
+        const bool passed = mouse.comparison->recommend_candidate;
+        const std::string fix_id = s.candidate_profile_id;
         mouse.validation = std::move(s);
         mouse.tab = 3;
+        // A fix that passed is used straight away: chosen, and switched on in the player's games
+        // through Raw Accel when it is installed and its settings.json is known.
+        MouseProfileRecord* m = mouse_profile(fix_id);
+        if (passed && m && m->transform.kind == TransformKind::RawAccel) {
+            setup_.active_mouse_profile = m->id;
+            for (auto& x : setup_.mouse_profiles)
+                if (x.status == "active") x.status = "candidate";
+            m->status = "active";
+            save_now();
+            const std::filesystem::path sj = rawaccel_settings_path();
+            std::string msg;
+            if (!rawaccel_installed())
+                toast(ui::Tone::Good, "Your fix passed. Install Raw Accel (Settings → About → Run the setup again) to use it in your games.", 10.0);
+            else if (sj.empty())
+                toast(ui::Tone::Good, "Your fix passed. Click \"Turn on\" on the Mouse tab to use it in your games.", 10.0);
+            else if (games_turn_on(sj, &msg))
+                toast(ui::Tone::Good, "Your fix passed and is now on in your games.", 10.0);
+            else
+                toast(ui::Tone::Warn, "Your fix passed, but it could not be switched on: " + msg, 10.0);
+            mouse.patch_message = msg;
+        }
     }
     save();
 }

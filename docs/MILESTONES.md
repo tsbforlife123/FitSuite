@@ -127,7 +127,7 @@ title bar and following Windows' app mode; PresentMon launched by FitSuite; anyt
    timer rings empty, tracking and switching rounds play smoothly; the pointer is hidden and released when you
    Alt-Tab or press Esc; afterwards box 1 shows the aim report. The test-scene line reports a frame rate near
    twice your refresh rate.
-4. Per-game switching: Mouse tab → 4 Use it in your games → tick VALORANT → "Turn on". Start VALORANT: within
+4. Per-game switching: Mouse tab → 2 Use it in your games → tick VALORANT → "Turn on". Start VALORANT: within
    about two seconds Raw Accel shows the corrected values (open its window afterwards to check); Alt-Tab to the
    desktop for a few seconds: your own values. Close the FitSuite window: its icon stays in the notification
    area, and right-click → Quit puts your own values back.
@@ -138,7 +138,7 @@ title bar and following Windows' app mode; PresentMon launched by FitSuite; anyt
 6. Task Manager: with FitSuite open and untouched, CPU and GPU use stay near zero; closed to the notification
    area, FitSuite shows the efficiency-mode leaf, no GPU memory and a small working set. Reopening it from the
    icon draws the window normally.
-7. Mouse tab → 5 Check your fix → Quick check runs 48 targets with the fix in use and gives a verdict; Settings →
+7. Settings → Your mouse → Quick check runs 48 targets with the fix in use and gives a verdict; Settings →
    Check my setup shows OK for everything you have set up.
 8. With Settings → Extra tools ticked, the Frame rate tab finds PresentMon (put it in a `tools` folder next to
    `FitSuite.exe`) and records a run in the Range.

@@ -1212,13 +1212,16 @@ void page_mousefit(App& app) {
         ui::faint("800 and 0.400 are only examples: enter your own, so the test feels like your game.");
     ui::end_card();
 
+    // 1 — measure, see the fix, and its blind test, in one box. A fix found by the measurement goes to
+    // its blind test by itself, and one that passes is switched on (App::on_mouse_test_done).
     ui::begin_card("##mf_measure", lw, 0);
-    ui::card_title("1  Measure your flicks");
+    ui::card_title("1  Measure and fix");
     ImGui::BeginDisabled(!s1);
     if (!s2) {
         ui::wrapped("Five short rounds, about 4 minutes in all: flicks, micro-adjustments, tracking and target switching, "
-                    "like an aim trainer. Click to start each round; targets keep coming, one shot each. Full screen; Esc "
-                    "stops, switching windows pauses.", theme::kTextMuted);
+                    "like an aim trainer. If your flicks need a fix, a 2-minute blind test follows, and a fix that makes "
+                    "you faster is switched on in your games. Full screen; Esc stops, switching windows pauses.",
+                    theme::kTextMuted);
         if (ui::button_primary("Measure my flicks")) app.start_calibration();
         if (!s1) {
             ImGui::SameLine();
@@ -1252,12 +1255,17 @@ void page_mousefit(App& app) {
         if (ui::button_secondary("Measure again")) app.start_calibration();
     }
     ImGui::EndDisabled();
-    ui::end_card();
 
-    ui::begin_card("##mf_fix", lw, 0);
-    ui::card_title("2  Your fix");
+    // Your fix (part of box 1).
+    if (s2) {
+        ImGui::Dummy(ImVec2(0, 4));
+        ImGui::Separator();
+        ui::push_font(fonts().semibold, theme::kBody);
+        ImGui::TextUnformatted("Your fix");
+        ui::pop_font();
+    }
     if (!s2) {
-        ui::faint("Shown after you measure your flicks.");
+        // nothing yet
     } else if (!fit_ok) {
         ui::wrapped(ui_.fit ? ui_.fit->message.c_str() : "Not enough data.", theme::kTextMuted);
     } else if (!fix) {
@@ -1280,25 +1288,25 @@ void page_mousefit(App& app) {
         }
         ui::faint("Your average sensitivity stays the same, and no direction changes by more than 8%%.");
     }
-    ui::end_card();
 
-    // Blind test
+    // Blind test (part of box 1).
     const ComparisonResult* cmp =
         ui_.comparison && fix && ui_.validation && ui_.validation->candidate_profile_id == fix->id ? &*ui_.comparison : nullptr;
     const std::string verdict = cmp ? to_string(cmp->verdict) : fix && fix->validation ? fix->validation->verdict : std::string();
     const double ratio = cmp ? cmp->time_ratio : fix && fix->validation ? fix->validation->time_ratio : 1.0;
     const bool improved = verdict == "improved";
     const bool chosen = fix && setup.active_mouse_profile == fix->id;
-    ui::begin_card("##mf_test", lw, 0);
-    ui::card_title("3  Blind test");
     if (!fix) {
-        ui::faint("Needs a fix first.");
+        // no fix: nothing to test
     } else if (verdict.empty()) {
-        ui::wrapped("Eight short flick blocks (about 2 minutes). FitSuite switches between your current setup and the fix "
-                    "without telling you which is on. The fix only wins if you hit targets faster without missing more.",
+        ImGui::Dummy(ImVec2(0, 2));
+        ui::wrapped("Not blind-tested yet. Eight short flick blocks (about 2 minutes): FitSuite switches between your "
+                    "current setup and the fix without telling you which is on, and uses the fix only if you hit targets "
+                    "faster without missing more.",
                     theme::kTextMuted);
         if (ui::button_primary("Start the blind test")) app.start_validation(fix->id);
     } else {
+        ImGui::Dummy(ImVec2(0, 2));
         ui::push_font(fonts().semibold, theme::kBody);
         if (improved) ImGui::TextColored(theme::v4(theme::kGood), "%.0f%% faster with the fix, and just as accurate.", (1.0 - ratio) * 100.0);
         else if (verdict == "worse") ImGui::TextColored(theme::v4(theme::kBad), "The fix made you slower. Keep your current setup.");
@@ -1327,39 +1335,18 @@ void page_mousefit(App& app) {
             app.start_validation(fix->id);
         }
     }
-    ui::end_card();
 
-    // 5 — keep it fitting: the quick check of the chosen fix
-    ui::begin_card("##mf_check", lw, 0);
-    ui::card_title("5  Check your fix");
+    // The quick check lives in Settings → Your mouse now; only its reminder and a changed verdict show here.
     if (MouseProfileRecord* used = app.active_fix()) {
-        const auto& lc = used->last_check;
-        const bool changed = lc && lc->verdict == "changed";
-        if (!lc) {
-            ui::wrapped("A one-minute check with your fix in use tells you whether it still fits, or whether your aim has "
-                        "changed and a new measurement is worth it.", theme::kTextMuted);
-        } else {
-            const unsigned c = changed ? theme::kWarn : lc->verdict == "still_fits" ? theme::kGood : theme::kTextMuted;
-            ui::wrapped(lc->explanation.c_str(), c);
-            ui::faint("Last check %s", short_time(lc->finished_utc).c_str());
-        }
-        if (app.check_due())
-            ui::callout(ui::Tone::Info, "Time for a quick check",
-                        ui::fmt("Your fix was last measured or checked %d days ago.", app.days_since_fix_checked()).c_str());
+        const bool changed = used->last_check && used->last_check->verdict == "changed";
         if (changed) {
-            if (ui::button_primary("Measure again")) app.start_calibration();
-            ImGui::SameLine();
-            if (ui::button_secondary("Check again")) app.start_check();
-        } else if (app.check_due() || !lc) {
-            if (ui::button_primary("Quick check (about 1 min)")) app.start_check();
-        } else if (ui::button_secondary("Quick check (about 1 min)")) {
-            app.start_check();
+            ui::callout(ui::Tone::Warn, "Your aim has changed", used->last_check->explanation.c_str());
+        } else if (app.check_due()) {
+            ui::callout(ui::Tone::Info, "Time for a quick check",
+                        ui::fmt("Your fix was last measured or checked %d days ago. About 1 minute.",
+                                app.days_since_fix_checked()).c_str());
+            if (ui::button_secondary("Quick check")) app.start_check();
         }
-        const int every = setup.app.check_reminder_days;
-        ImGui::SameLine();
-        ui::faint("%s", every == 7 ? "Reminder: every week" : every == 30 ? "Reminder: every month" : "Reminder: off");
-    } else {
-        ui::faint("After you choose a fix, a one-minute check tells you whether it still fits.");
     }
     ui::end_card();
     ImGui::EndGroup();
@@ -1397,7 +1384,7 @@ void games_box(App& app, MouseProfileRecord* fix, float w) {
     const bool usable = chosen || fg.enabled || everywhere;
 
     ui::begin_card("##mf_games", w, 0);
-    ui::card_title("4  Use it in your games");
+    ui::card_title("2  Use it in your games");
     if (!driver && !fg.enabled) {
         ui::wrapped("Needs Raw Accel, a free signed mouse driver (administrator rights and a restart to install).",
                     theme::kTextMuted);

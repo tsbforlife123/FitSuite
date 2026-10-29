@@ -49,8 +49,8 @@ check boxes and buttons, and a status bar at the bottom. There are no dropdown m
 check box or a radio button, and the few actions that need a second thought (making the fix your Raw Accel
 default, stopping your fix, deleting a run) ask once, in place.
 
-* **Mouse** holds the whole MouseFit flow on one screen: *Your mouse*, *1 Measure your flicks* (with your aim
-  report), *2 Your fix*, *3 Blind test*, *4 Use it in your games* and *5 Check your fix*, with the direction
+* **Mouse** holds the whole MouseFit flow on one screen: *Your mouse*, *1 Measure and fix* (with your aim
+  report, your fix and its blind test) and *2 Use it in your games*, with the direction
   chart on the right.
 * **History** lists your saved profiles and every change FitSuite made, each with a way back.
 * **Nerd stats** holds everything else: every measurement, chart, confidence interval and model detail, plus all
@@ -121,7 +121,7 @@ whether a quick-check reminder is due. With the window open and untouched it red
 and a few times a second while it is behind a game. These behaviours are Windows-only and have not been
 measured on a Windows PC yet.
 
-### Quick check (Mouse tab → 5 Check your fix)
+### Quick check (Settings → Your mouse)
 
 About a minute of flicks (three short rounds, 48 targets in 8 directions) with your fix in use. FitSuite looks for any directional
 bias that is left and either says the fix still fits or tells you which direction has changed and that it is
@@ -151,7 +151,7 @@ left and right. If your downward flicks land short, for example, Raw Accel then 
 sensitivity whenever the mouse moves down. It reacts only to the direction you move, never to the screen or
 the game.
 
-**Only in your games (Mouse tab → 4 Use it in your games).** Tick the games where the fix should work (VALORANT
+**Only in your games (Mouse tab → 2 Use it in your games).** Tick the games where the fix should work (VALORANT
 is ticked; 13 other shooters are listed, and you can add any game while it is running), then **Turn on**, or
 click **Use this fix in my games** right after a blind test it passed. FitSuite switches Raw
 Accel to your settings plus the fix while one of those games is in front, and back to your own settings for
@@ -191,7 +191,7 @@ administrator rights and a restart.
 
 ### Removing FitSuite
 
-If the per-game mouse fix is on, turn it off first (Mouse tab → 4 Use it in your games → **Turn off**): that
+If the per-game mouse fix is on, turn it off first (Mouse tab → 2 Use it in your games → **Turn off**): that
 puts your own Raw Accel settings back. Untick **Settings → Open FitSuite when Windows starts** to remove its
 startup entry. Then quit FitSuite (right-click its notification-area icon → Quit) and delete the folder you
 extracted and `%LOCALAPPDATA%\FitSuite`. If you applied a refresh rate with FitSuite, change it back in Windows
