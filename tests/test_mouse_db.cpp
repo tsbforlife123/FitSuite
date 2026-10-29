@@ -6,7 +6,8 @@
 using namespace fit;
 
 TEST_CASE("the mouse list: every entry is named, sourced and dated, with no made-up fields") {
-    REQUIRE(known_mice().size() >= 10);
+    REQUIRE(known_mice().size() >= 200);
+    int with_specs = 0;
     std::set<std::string> names;
     for (const auto& m : known_mice()) {
         CHECK_FALSE(m.maker.empty());
@@ -17,16 +18,24 @@ TEST_CASE("the mouse list: every entry is named, sourced and dated, with no made
         if (m.min_dpi > 0) CHECK(m.max_dpi > m.min_dpi);
         CHECK(m.max_dpi <= 100000);
         CHECK(m.max_polling_hz <= 8000);
+        if (m.has_specs()) ++with_specs;
+        else CHECK(m.polling_note.empty());  // a name-only entry says nothing it did not check
     }
+    CHECK(with_specs >= 30);
 }
 
 TEST_CASE("searching the mouse list as you type") {
     auto r = search_mice("superlight");
-    REQUIRE(r.size() == 2);  // the Superlight and the Superlight 2
+    REQUIRE(r.size() == 6);  // Superlight, Superlight 2, 2c, 2 DEX, 2 SE, G305 X Superlight
     r = search_mice("SUPERLIGHT 2");
     REQUIRE_FALSE(r.empty());
     CHECK(r.front()->model == "G Pro X Superlight 2");
-    CHECK(search_mice("razer viper").size() == 2);
+    CHECK(search_mice("razer viper").size() == 6);
+    CHECK(search_mice("viper", 3).size() == 3);  // at most as many as asked for
+    const KnownMouse* names_only = find_mouse("Pulsar X2 v3");
+    REQUIRE(names_only);
+    CHECK_FALSE(names_only->has_specs());
+    CHECK(mouse_advice(*names_only, 800, 1000).warnings.empty());  // no specs, no warnings
     CHECK(search_mice("").empty());
     CHECK(search_mice("no such mouse").empty());
 

@@ -430,7 +430,8 @@ void mouse_model_field(App& app, float width) {
         app.save();
     };
     ImGui::SetNextItemWidth(width);
-    if (ImGui::InputTextWithHint("##model", "e.g. Logitech G Pro X Superlight 2", app.model_input, sizeof app.model_input)) {
+    static const std::string hint = "Search " + std::to_string(known_mice().size()) + " mice: type a maker or model";
+    if (ImGui::InputTextWithHint("##model", hint.c_str(), app.model_input, sizeof app.model_input)) {
         std::string m = app.model_input;
         while (!m.empty() && m.back() == ' ') m.pop_back();
         setup.mouse.model = m;
@@ -447,6 +448,11 @@ void mouse_model_field(App& app, float width) {
         }
         if (matches.empty() && std::strlen(app.model_input) >= 3)
             ui::faint("Not in FitSuite's list of %d mice: that is fine, the test works with any mouse.", int(known_mice().size()));
+        return;
+    }
+    if (!known->has_specs()) {
+        ui::faint("Listed on %s (checked %s). Its specs are not in FitSuite yet: use the DPI from your mouse software.",
+                  known->source.c_str(), known->checked.c_str());
         return;
     }
     // Published specs of the chosen mouse, and anything that does not fit them.

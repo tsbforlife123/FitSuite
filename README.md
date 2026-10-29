@@ -65,12 +65,14 @@ default, stopping your fix, deleting a run) ask once, in place.
 | Section | What is there |
 |---|---|
 | Appearance | Theme: **Same as Windows** (follows Windows' light or dark app mode, also while FitSuite is open), **Light** or **Dark**. The title bar follows. |
-| Your mouse | Mouse model (typed by you; the detected device name is shown below it), DPI, VALORANT sensitivity and the distance of a full turn; how often to remind you of the quick check (every week, every month, never); **Measure again**, **Quick check** and **Stop using my fix**. A different mouse model, DPI or sensitivity marks your fix as measured under other conditions. |
+| Your mouse | Mouse model (search about 200 gaming mice by maker or model, or type any name; the detected device name is shown below it), DPI, VALORANT sensitivity and the distance of a full turn; how often to remind you of the quick check (every week, every month, never); **Measure again**, **Quick check** and **Stop using my fix**. A different mouse model, DPI or sensitivity marks your fix as measured under other conditions. |
 | Startup and background | **Open FitSuite when Windows starts** (off until you tick it), **Start in the notification area, without opening the window** (on), **Keep running in the notification area when I close the window** (on; always on while your fix switches per game). |
 | Extra tools | **Show the Frame rate and Monitor tabs** (off). |
 | Game sensitivity | Your sensitivity in the other games you ticked, converted to the mouse distance of a full turn and compared with your VALORANT setting (see below). |
+| Windows settings for games | Read only: Game Mode, hardware-accelerated GPU scheduling, power plan and Enhance pointer precision, each with what it is set to, the usual choice and **Open** for the Windows settings page that changes it. FitSuite never changes them. |
 | Check my setup | One button that checks each monitor's refresh rate, Raw Accel's driver, `settings.json` and `writer.exe`, your mouse, the startup entry (including whether Task Manager has switched it off), the per-game switching and the data folder, and says what is missing. |
-| About | Version, where your data is, **Open data folder**. |
+| Updates | **Check for updates automatically** (on) and **Install updates by themselves** (off: a new version is downloaded and checked in the background and installed the next time FitSuite opens, never while it runs). |
+| About | Where your data is, **Open data folder**. |
 
 ### Is your monitor running at full speed?
 
