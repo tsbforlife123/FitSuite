@@ -151,6 +151,7 @@ private:
         double yaw, pitch;
     };
     std::vector<TrailPoint> tk_trail_;  // where the target was over the last fit::kTrackTrailMs
+    std::vector<TrailPoint> aim_trail_; // where the crosshair pointed recently (drawn as its trail)
     bool track_on_target() const;       // on the target or its trail
     int64_t tk_last_us_ = 0, tk_played_us_ = 0;
     double tk_on_s_ = 0.0, tk_total_s_ = 0.0;

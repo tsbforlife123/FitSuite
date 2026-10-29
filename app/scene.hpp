@@ -29,6 +29,8 @@ public:
     void draw_environment();
     void draw_target(double yaw_deg, double pitch_deg, double radius_deg, ImU32 color, bool outline_only = false);
     void draw_crosshair(ImU32 color);
+    // A straight segment between two view directions (for the crosshair's trail).
+    void draw_line(double yaw0, double pitch0, double yaw1, double pitch1, ImU32 color, float thickness);
     // The target's timer: a ring around it that empties clockwise as time runs out (frac_left 1 → 0).
     void draw_timer(double yaw_deg, double pitch_deg, double radius_deg, float frac_left, ImU32 color);
     double focal_px() const { return fx_; }

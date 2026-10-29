@@ -19,6 +19,8 @@ namespace {
 // Switching targets appear within this box around the round's centre (degrees).
 constexpr double kSwitchYaw = 18.0, kSwitchPitch = 9.0;
 // Tracking: the target's movement is fit::TrackMotion (mouse_schedule.hpp).
+// How much of the crosshair's recent path is drawn behind it.
+constexpr double kAimTrailMs = 250.0;
 }  // namespace
 
 MouseTest::MouseTest(IPlatform& platform, MouseTestConfig cfg)
@@ -692,6 +694,24 @@ void MouseTest::frame(ImVec2 origin, ImVec2 size) {
     if (now < flash_until_us_)
         r.draw_target(flash_yaw_, flash_pitch_, flash_radius_, theme::rgb(flash_hit_ ? theme::kSceneGood : theme::kSceneBad, 0.85f),
                       !flash_hit_);
+    // The crosshair's trail: where it pointed over the last kAimTrailMs, a thin line fading out with
+    // age, so you can see the shape of each flick (like Aim Lab's path). Not in tracking rounds, where
+    // the target has its own trail.
+    if (phase_ == Phase::Playing && info().task != Task::Track) {
+        aim_trail_.push_back({now, cam_.yaw_deg, cam_.pitch_deg});
+        size_t old = 0;
+        while (old < aim_trail_.size() && aim_trail_[old].t_us < now - int64_t(kAimTrailMs * 1000.0)) ++old;
+        aim_trail_.erase(aim_trail_.begin(), aim_trail_.begin() + std::ptrdiff_t(old));
+        for (size_t i = 1; i < aim_trail_.size(); ++i) {
+            const auto& a = aim_trail_[i - 1];
+            const auto& b = aim_trail_[i];
+            const double age = double(now - b.t_us) / (kAimTrailMs * 1000.0);
+            r.draw_line(a.yaw, a.pitch, b.yaw, b.pitch, theme::rgb(theme::kCrosshair, float(0.45 * std::clamp(1.0 - age, 0.0, 1.0))),
+                        2.0f);
+        }
+    } else {
+        aim_trail_.clear();
+    }
     r.draw_crosshair(theme::rgb(theme::kCrosshair));
     draw_hud(dl, origin, size, now);
 

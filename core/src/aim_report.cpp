@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdio>
 
+#include "fit/mouse_analysis.hpp"
 #include "fit/mouse_schedule.hpp"
 #include "fit/stats.hpp"
 
@@ -193,7 +194,39 @@ AimReport make_aim_report(const Session& s) {
                           targets, 100.0 * hits / targets, med.empty() ? 0.0 : mean(med));
         rep.lines.push_back(buf);
     }
+    if (std::string curve = flick_curve_line(s); !curve.empty()) rep.lines.push_back(curve);
     return rep;
+}
+
+std::string flick_curve_line(const Session& s) {
+    std::vector<TrialMetrics> ms;
+    for (const auto& t : s.trials)
+        if (t.spec.purpose == TrialPurpose::Scored && t.spec.condition == Condition::Baseline && t.spec.task != Task::Track &&
+            (t.outcome == TrialOutcome::Hit || t.outcome == TrialOutcome::Miss || t.outcome == TrialOutcome::Timeout))
+            ms.push_back(analyze_trial(t, s.conditions.mapping));
+    const auto dirs = summarize_by_direction(ms, 8);
+    std::vector<double> abs_curves, straight;
+    int worst = -1;
+    for (int b = 0; b < 8; ++b) {
+        const auto& d = dirs[size_t(b)];
+        if (d.n < 4) continue;
+        abs_curves.push_back(std::fabs(d.mean_curve_pct));
+        straight.push_back(d.mean_straightness_pct);
+        if (worst < 0 || std::fabs(d.mean_curve_pct) > std::fabs(dirs[size_t(worst)].mean_curve_pct)) worst = b;
+    }
+    if (abs_curves.size() < 5) return "";
+    char buf[320];
+    const double w = dirs[size_t(worst)].mean_curve_pct;
+    // Named when it is clearly bigger than in the other directions (everyone's flicks curve a little).
+    if (std::fabs(w) >= kCurveNotablePct && std::fabs(w) - median(abs_curves) >= 2.0)
+        std::snprintf(buf, sizeof buf,
+                      "Flick path: your flicks curve most when moving %s: they bow about %.0f%% to the %s of a straight "
+                      "line. Straightness %.0f%% on average.",
+                      kDirNames[worst], std::fabs(w), w > 0 ? "left" : "right", mean(straight));
+    else
+        std::snprintf(buf, sizeof buf, "Flick path: your flicks are about equally straight in every direction (straightness %.0f%%).",
+                      mean(straight));
+    return buf;
 }
 
 }  // namespace fit
