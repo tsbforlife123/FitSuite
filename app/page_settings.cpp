@@ -8,6 +8,7 @@
 #include "fit/mouse_db.hpp"
 #include "fit/timeutil.hpp"
 #include "fit/update.hpp"
+#include "fit/windows_checks.hpp"
 #include "imgui.h"
 #include "theme.hpp"
 
@@ -264,6 +265,45 @@ void game_sensitivity(App& app, float w) {
     ui::end_card();
 }
 
+// Read only: what a few game-related Windows settings are set to, the usual choice, and a link to
+// the Windows page that changes each one. Read again every few seconds while Settings is open, so a
+// change made in Windows shows up here.
+void windows_settings(App& app, float w) {
+    static double read_at = -100.0;
+    static std::vector<fit::WindowsCheck> checks;
+    if (ImGui::GetTime() - read_at > 3.0) {
+        read_at = ImGui::GetTime();
+        checks = fit::windows_checks(app.platform().windows_game_settings());
+    }
+    ui::begin_card("##set_windows", w, 0);
+    ui::card_title("Windows settings for games",
+                   "FitSuite only reads these. Click Open to change one in Windows; the usual choice is in grey.");
+    const ImGuiTableFlags tf = ImGuiTableFlags_BordersInnerH | ImGuiTableFlags_SizingFixedFit;
+    if (ImGui::BeginTable("##winchecks", 3, tf)) {
+        ImGui::TableSetupColumn("name", ImGuiTableColumnFlags_WidthFixed, 200);
+        ImGui::TableSetupColumn("value", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableSetupColumn("open", ImGuiTableColumnFlags_WidthFixed, 50);
+        for (const auto& c : checks) {
+            ImGui::PushID(c.name.c_str());
+            ImGui::TableNextRow();
+            ImGui::TableNextColumn();
+            ImGui::TextUnformatted(c.name.c_str());
+            ImGui::TableNextColumn();
+            const unsigned col = c.state == fit::WindowsCheck::State::Look      ? theme::kWarn
+                                 : c.state == fit::WindowsCheck::State::Unknown ? theme::kTextMuted
+                                                                                : theme::kGood;
+            ImGui::TextColored(theme::v4(col), "%s", c.current.c_str());
+            ui::faint("Usual: %s", c.usual.c_str());
+            ui::wrapped(c.note.c_str(), theme::kTextMuted);
+            ImGui::TableNextColumn();
+            if (ui::button_link("Open")) app.platform().open_url(c.settings_uri);
+            ImGui::PopID();
+        }
+        ImGui::EndTable();
+    }
+    ui::end_card();
+}
+
 void check_setup(App& app, float w) {
     ui::begin_card("##set_check", w, 0);
     ui::card_title("Check my setup", "Looks at everything FitSuite needs on this PC and says what is missing.");
@@ -433,6 +473,7 @@ void page_settings(App& app) {
     ImGui::BeginGroup();
     game_sensitivity(app, w);
     check_setup(app, w);
+    windows_settings(app, w);
     updates(app, w);
     about(app, w);
     ImGui::EndGroup();

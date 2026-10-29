@@ -197,7 +197,9 @@ void Platform::open_folder(const fs::path& p) {
 }
 
 void Platform::open_url(const std::string& url) {
-    if (url.rfind("https://", 0) != 0) return;  // only web pages, never local programs
+    // Only web pages and Windows' own Settings pages ("ms-settings:…"), never local programs.
+    if (url.rfind("https://", 0) != 0 && url.rfind("ms-settings:", 0) != 0) return;
+    if (url.find_first_of("\"\r\n") != std::string::npos) return;
     ShellExecuteW(hwnd_, L"open", widen(url).c_str(), nullptr, nullptr, SW_SHOWNORMAL);
 }
 
