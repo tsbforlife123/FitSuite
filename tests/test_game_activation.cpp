@@ -1,3 +1,5 @@
+#include <cmath>
+
 #include "doctest.h"
 #include "fit/game_activation.hpp"
 #include "fit/profile.hpp"
@@ -128,4 +130,14 @@ TEST_CASE("the main game: ids, where its sensitivity is, and what is recorded wi
     REQUIRE(q);
     CHECK(q->game.id == "fortniteclient-win64-shipping.exe");
     CHECK(q->game.cm360 == doctest::Approx(38.5));
+}
+
+TEST_CASE("the test shows each game's own view: fixed where the game fixes it") {
+    CHECK(game_fixed_hfov("VALORANT-Win64-Shipping.exe") == doctest::Approx(103.0));
+    CHECK(game_fixed_hfov("cs2.exe") == doctest::Approx(106.26).epsilon(1e-3));
+    // Counter-Strike 2: 90 degrees at 4:3, widened to 16:9 with the same vertical view.
+    const double kPi = 3.14159265358979;
+    CHECK(2.0 * std::atan(std::tan(45.0 * kPi / 180.0) * 4.0 / 3.0) * 180.0 / kPi == doctest::Approx(106.26).epsilon(1e-3));
+    CHECK(game_fixed_hfov("overwatch.exe") == 0.0);  // a setting: entered by the player
+    CHECK(game_fixed_hfov("unknown.exe") == 0.0);
 }

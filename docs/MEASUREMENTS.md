@@ -22,7 +22,11 @@ shown once for the group.
 
 * FPS-style camera (yaw/pitch) with a fixed crosshair. One mouse count turns the view like your main game:
   its published turn rate × sensitivity (VALORANT 0.07°, CS2 and Apex 0.022°, Overwatch 2 and Call of Duty
-  0.0066°), or for games without one, the cm/360 you enter. Horizontal field of view 103° at 16:9 (VALORANT's).
+  0.0066°), or for games without one, the cm/360 you enter. The view is your main game's: horizontal field
+  of view 103° at 16:9 for VALORANT, 106.26° for Counter-Strike 2 (its fixed 90° at 4:3), and for other games
+  the 16:9 value you enter (103° until you do). Other screen shapes keep the 16:9 vertical view, as these
+  games do, so targets appear where they would in your game on your monitor. FitSuite draws this scene
+  itself; it never reads the game's picture.
 * Input comes from Windows Raw Input on a dedicated thread, timestamped with `QueryPerformanceCounter`
   as each report arrives. Only one mouse is used per session (the one you pick, or the first that moves).
   Software-generated input (reports without a device handle, e.g. `SendInput`) and absolute-position

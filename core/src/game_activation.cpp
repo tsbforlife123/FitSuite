@@ -10,8 +10,8 @@ const std::vector<KnownGame>& known_shooters() {
     // per count at sensitivity 1. The others have FOV-dependent or unpublished scales, so FitSuite
     // asks for the turn distance (cm/360) instead of converting.
     static const std::vector<KnownGame> games = {
-        {"valorant-win64-shipping.exe", "VALORANT", 0.07, "Settings → General → Mouse → Sensitivity: Aim"},
-        {"cs2.exe", "Counter-Strike 2", 0.022, "Settings → Keyboard / Mouse → Mouse Sensitivity"},
+        {"valorant-win64-shipping.exe", "VALORANT", 0.07, "Settings → General → Mouse → Sensitivity: Aim", 103.0},
+        {"cs2.exe", "Counter-Strike 2", 0.022, "Settings → Keyboard / Mouse → Mouse Sensitivity", 106.26},
         {"r5apex.exe", "Apex Legends", 0.022, "Settings → Mouse/Keyboard → Mouse Sensitivity"},
         {"r5apex_dx12.exe", "Apex Legends", 0.022, "Settings → Mouse/Keyboard → Mouse Sensitivity"},
         {"overwatch.exe", "Overwatch 2", 0.0066, "Options → Controls → Sensitivity"},
@@ -34,6 +34,13 @@ double game_yaw(const std::string& exe) {
     const std::string e = normalize_exe(exe);
     for (const auto& g : known_shooters())
         if (e == g.exe) return g.yaw;
+    return 0.0;
+}
+
+double game_fixed_hfov(const std::string& exe) {
+    const std::string e = normalize_exe(exe);
+    for (const auto& g : known_shooters())
+        if (e == g.exe) return g.fixed_hfov_16x9;
     return 0.0;
 }
 

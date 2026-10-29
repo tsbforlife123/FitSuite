@@ -16,11 +16,16 @@ struct KnownGame {
     double yaw = 0.0;
     // Where the sensitivity is in the game's menus, when FitSuite knows it; nullptr otherwise.
     const char* sens_where = nullptr;
+    // Horizontal field of view at 16:9 when the game fixes it (VALORANT 103°; Counter-Strike 2 keeps
+    // 90° at 4:3, which is 106.26° at 16:9); 0 = a setting in the game, entered by the player.
+    double fixed_hfov_16x9 = 0.0;
 };
 
 // The game the player measures with (SetupProfile::game.id). "valorant" (the id used before other
 // games could be chosen) and "" mean VALORANT; any other id is the game's executable name.
 std::string main_game_exe(const std::string& game_id);
+// The game's fixed horizontal field of view at 16:9, or 0 when it is a setting in the game.
+double game_fixed_hfov(const std::string& exe);
 std::string game_id_for_exe(const std::string& exe);
 // Where to find the sensitivity in a game's menus: a known path, or general advice.
 std::string game_sens_where(const std::string& exe);

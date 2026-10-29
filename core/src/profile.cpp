@@ -39,6 +39,8 @@ Conditions current_conditions(const SetupProfile& p) {
     } else if (p.game.cm360 > 0) {
         c["game.cm360"] = num(p.game.cm360);
     }
+    // The view the test showed, when the player set it (games with a fixed view always show the same).
+    if (game_fixed_hfov(main_game_exe(p.game.id)) <= 0.0 && p.game.hfov > 0.0) c["game.hfov"] = num(p.game.hfov);
     put("pc.cpu", p.pc.cpu);
     put("pc.os", p.pc.os);
     if (!p.pc.gpus.empty()) {
@@ -54,7 +56,7 @@ Conditions current_conditions(const SetupProfile& p) {
 }
 
 std::vector<std::string> condition_keys(const std::string& tool) {
-    if (tool == "mousefit") return {"mouse.model", "mouse.device", "mouse.dpi", "game.id", "game.sensitivity", "game.cm360"};
+    if (tool == "mousefit") return {"mouse.model", "mouse.device", "mouse.dpi", "game.id", "game.sensitivity", "game.cm360", "game.hfov"};
     if (tool == "framefit") return {"pc.cpu", "pc.gpu", "pc.gpu_driver", "pc.os", "display.resolution", "game.id"};
     if (tool == "motionfit") return {"display.name", "display.resolution"};
     return {};
@@ -75,6 +77,7 @@ std::string describe_condition_key(const std::string& key) {
         {"mouse.model", "Mouse model"},    {"mouse.device", "Mouse"},         {"mouse.dpi", "DPI"},
         {"game.id", "Game"},               {"game.sensitivity", "In-game sensitivity"},
         {"game.cm360", "Full turn (cm/360)"},
+        {"game.hfov", "Field of view"},
         {"pc.cpu", "CPU"},                 {"pc.os", "Windows version"},
         {"pc.gpu", "GPU"},                 {"pc.gpu_driver", "GPU driver"},
         {"display.name", "Monitor"},       {"display.resolution", "Resolution"},

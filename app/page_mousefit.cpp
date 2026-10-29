@@ -3,6 +3,7 @@
 #include <cmath>
 
 #include "app.hpp"
+#include "fit/mouse_db.hpp"
 #include "fit/rawaccel_export.hpp"
 #include "fit/store.hpp"
 #include "fit/timeutil.hpp"
@@ -904,9 +905,16 @@ bool is_main_game(const SetupProfile& s, const GameChoice& g) {
     return std::find(g.exes.begin(), g.exes.end(), main) != g.exes.end();
 }
 
+double main_game_hfov(const SetupProfile& s) {
+    const double fixed = game_fixed_hfov(main_game_exe(s.game.id));
+    if (fixed > 0.0) return fixed;
+    return s.game.hfov > 0.0 ? s.game.hfov : 103.0;
+}
+
 GameMapping main_game_mapping(const SetupProfile& s) {
     GameMapping m;
     m.game_id = s.game.id;
+    m.hfov_deg_16x9 = main_game_hfov(s);  // the test shows the same view as the game
     const double yaw = game_yaw(main_game_exe(s.game.id));
     if (yaw > 0.0) {
         m.deg_per_count_at_sens1 = yaw;
@@ -942,6 +950,20 @@ void main_game_sens_input(App& app, float width) {
         ui::help_marker("FitSuite cannot convert this game's sensitivity (its scale depends on the field of view). Measure "
                         "how far you move the mouse for one full turn in the game, or use a sensitivity converter, and "
                         "enter the distance.");
+    }
+    // The test draws the game's view: fixed for VALORANT and Counter-Strike 2, a setting elsewhere.
+    if (game_fixed_hfov(exe) <= 0.0) {
+        float fov = float(s.game.hfov > 0.0 ? s.game.hfov : 103.0);
+        ImGui::SetNextItemWidth(width);
+        if (ImGui::InputFloat("##hfov", &fov, 0.0f, 0.0f, "%.0f")) {
+            s.game.hfov = std::clamp(double(fov), 50.0, 170.0);
+            app.save();
+        }
+        ImGui::SameLine();
+        ui::faint("° field of view");
+        ui::help_marker("So FitSuite's test shows targets where your game would. Enter the horizontal field of view at "
+                        "16:9 (103 if you are not sure). Some games show a different number in their settings, such as "
+                        "the 4:3 value; a field-of-view converter gives the 16:9 one.");
     }
 }
 
@@ -1224,6 +1246,13 @@ void page_mousefit(App& app) {
     // its blind test by itself, and one that passes is switched on (App::on_mouse_test_done).
     ui::begin_card("##mf_measure", lw, 0);
     ui::card_title("1  Measure and fix");
+    // What the chosen mouse's published specs say about the DPI entered and the report rate measured,
+    // here where measuring starts, so a wrong DPI is fixed before it goes into a measurement.
+    if (const KnownMouse* km = find_mouse(setup.mouse.model)) {
+        const MouseAdvice adv = mouse_advice(*km, setup.mouse.dpi, setup.mouse.polling_hz);
+        for (const auto& w : adv.warnings) ui::wrapped(w.c_str(), theme::kWarn);
+        for (const auto& n : adv.notes) ui::wrapped(n.c_str(), theme::kTextMuted);
+    }
     ImGui::BeginDisabled(!s1);
     if (!s2) {
         ui::wrapped("Five short rounds, about 4 minutes in all: flicks, micro-adjustments, tracking and target switching, "
