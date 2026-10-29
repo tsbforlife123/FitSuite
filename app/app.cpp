@@ -203,8 +203,7 @@ SessionConditions App::mouse_conditions() const {
     c.mouse_id = setup_.mouse.device_id;
     c.mouse_vid_pid = setup_.mouse.vid_pid;
     c.dpi = setup_.mouse.dpi;
-    c.mapping.game_id = setup_.game.id;
-    c.mapping.sensitivity = setup_.game.sensitivity;
+    c.mapping = main_game_mapping(setup_);  // the test turns the view like the player's main game
     c.display_refresh_hz = setup_.display.refresh_hz;
     c.display_width = setup_.display.width;
     c.display_height = setup_.display.height;
@@ -225,8 +224,8 @@ bool App::games_tests_blocked() {
 }
 
 void App::start_calibration() {
-    if (setup_.game.sensitivity <= 0 || setup_.mouse.dpi <= 0) {
-        toast(ui::Tone::Warn, "Enter your DPI and in-game sensitivity first.");
+    if (!main_game_ready(setup_)) {
+        toast(ui::Tone::Warn, "Enter your DPI and your " + main_game_sens_label(setup_) + " first.");
         return;
     }
     if (games_tests_blocked()) return;

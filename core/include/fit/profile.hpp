@@ -61,8 +61,9 @@ struct DisplayHardware {
 };
 
 struct GameProfile {
-    std::string id = "valorant";
-    double sensitivity = 0.4;
+    std::string id = "valorant";  // the game measured with: "valorant", or its executable name (main_game_exe)
+    double sensitivity = 0.4;     // in-game value, for games FitSuite can convert (game_yaw > 0)
+    double cm360 = 0.0;           // otherwise: mouse distance for a full turn, entered by the player
     double scoped_multiplier = 1.0;
     int fps_cap = 0;  // 0 = unlimited / unknown
     std::map<std::string, std::string> graphics;  // user-confirmed in-game settings

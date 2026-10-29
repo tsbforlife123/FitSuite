@@ -17,7 +17,7 @@ namespace {
 
 std::string describe_setting(const std::string& k) {
     if (k == "mouse.dpi") return "Mouse DPI";
-    if (k == "game.sensitivity") return "VALORANT sensitivity";
+    if (k == "game.sensitivity") return "In-game sensitivity";
     if (k == "game.scoped_multiplier") return "VALORANT scoped multiplier";
     if (k == "game.fps_cap") return "VALORANT FPS limit";
     if (k == "display.refresh_hz") return "Display refresh rate";
@@ -33,7 +33,7 @@ const char* restore_how(const std::string& k) {
     if (k == "mousefit.active_profile") return "FitSuite restores this";
     if (k == "display.refresh_hz") return "FitSuite can restore this";
     if (k == "mouse.dpi") return "Change it in your mouse software";
-    if (k.rfind("game.", 0) == 0) return "Change it in VALORANT";
+    if (k.rfind("game.", 0) == 0) return "Change it in the game";
     if (k == "display.overdrive") return "Change it in the monitor menu";
     return "Change it manually";
 }

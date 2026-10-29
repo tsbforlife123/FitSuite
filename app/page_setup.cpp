@@ -31,7 +31,7 @@ void step_welcome(App&) {
                 "undershoot or overshoot, through the free Raw Accel driver, only while your games are in front.");
     ImGui::Dummy(ImVec2(0, 4));
     ui::wrapped("This setup takes about two minutes:", theme::kTextMuted);
-    ui::wrapped("  1. Your mouse: DPI and VALORANT sensitivity.", theme::kTextMuted);
+    ui::wrapped("  1. Your mouse and game: DPI, the game you play most and its sensitivity.", theme::kTextMuted);
     ui::wrapped("  2. Your monitor: make sure it runs at full speed.", theme::kTextMuted);
     ui::wrapped("  3. Raw Accel: install it, or find the one you have.", theme::kTextMuted);
     ui::wrapped("  4. Startup and updates.", theme::kTextMuted);
@@ -77,22 +77,21 @@ bool step_mouse(App& app) {
         }
         ImGui::SameLine();
         ui::faint("in your mouse's own software (G HUB, Synapse, …), or on the mouse's DPI button");
-        row("VALORANT sensitivity");
-        float sens = float(setup.game.sensitivity);
-        ImGui::SetNextItemWidth(110);
-        if (ImGui::InputFloat("##sens", &sens, 0.0f, 0.0f, "%.3f")) {
-            setup.game.sensitivity = std::clamp(double(sens), 0.001, 20.0);
-            app.save();
-        }
-        ImGui::SameLine();
-        ui::faint("VALORANT: Settings → General → Mouse → Sensitivity: Aim");
+        row("Your main game");
+        ui::faint("The test turns the view like this game, so measure with the one you play most.");
+        row("");
+        main_game_picker(app);
+        row(main_game_sens_label(setup).c_str());
+        main_game_sens_input(app, 110);
+        row("");
+        ui::faint("%s", fit::game_sens_where(fit::main_game_exe(setup.game.id)).c_str());
         ImGui::EndTable();
     }
     ImGui::Dummy(ImVec2(0, 4));
-    if (setup.mouse.dpi > 0 && setup.game.sensitivity > 0)
-        ui::faint("A full turn (360°) takes %.1f cm of mouse movement.", valorant_cm360(setup));
-    ui::faint("800 and 0.400 are only examples: enter your own, so the test feels exactly like your game.");
-    return setup.mouse.dpi > 0 && setup.game.sensitivity > 0;
+    if (main_game_ready(setup))
+        ui::faint("A full turn (360°) takes %.1f cm of mouse movement.", main_game_cm360(setup));
+    ui::faint("Enter your own values, so the test feels exactly like your game.");
+    return main_game_ready(setup);
 }
 
 void step_monitor(App& app) {
@@ -221,8 +220,12 @@ void step_ready(App& app) {
     auto& setup = app.setup();
     std::error_code ec;
     const fs::path folder = app.rawaccel_folder();
-    check_line(setup.mouse.dpi > 0 && setup.game.sensitivity > 0,
-               ui::fmt("Mouse: %d DPI, VALORANT sensitivity %.3f", setup.mouse.dpi, setup.game.sensitivity).c_str());
+    const bool converted = fit::game_yaw(fit::main_game_exe(setup.game.id)) > 0.0;
+    check_line(main_game_ready(setup),
+               converted ? ui::fmt("Mouse: %d DPI, %s sensitivity %.3f", setup.mouse.dpi, main_game_name(setup).c_str(),
+                                   setup.game.sensitivity).c_str()
+                         : ui::fmt("Mouse: %d DPI, %s full turn %.1f cm", setup.mouse.dpi, main_game_name(setup).c_str(),
+                                   setup.game.cm360).c_str());
     check_line(app.slow_displays().empty(), app.slow_displays().empty() ? "Monitor runs at full speed"
                                                                          : "Monitor below its fastest refresh rate");
     check_line(app.rawaccel_installed() && !folder.empty() && fs::is_regular_file(folder / "settings.json", ec),

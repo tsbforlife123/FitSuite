@@ -223,13 +223,12 @@ void overview_details(App& app) {
     ImGui::SameLine(0, gap);
     ImGui::BeginGroup();
     ui::begin_card("##ov_game", w2, 0);
-    ui::card_title("Game: VALORANT", "Settings you entered. VALORANT has no settings API, so FitSuite never changes them.");
-    ui::kv("Sensitivity", ui::num(setup.game.sensitivity, 3));
+    const std::string game_title = "Game: " + main_game_name(setup);
+    ui::card_title(game_title.c_str(), "Settings you entered. FitSuite never changes game settings.");
+    if (fit::game_yaw(fit::main_game_exe(setup.game.id)) > 0.0) ui::kv("Sensitivity", ui::num(setup.game.sensitivity, 3));
     ui::kv("Scoped multiplier", ui::num(setup.game.scoped_multiplier, 2));
     ui::kv("FPS limit", setup.game.fps_cap > 0 ? std::to_string(setup.game.fps_cap) : "Unlimited / not entered");
-    const double cm360 = setup.mouse.dpi > 0 && setup.game.sensitivity > 0
-                             ? 360.0 / (0.07 * setup.game.sensitivity) / setup.mouse.dpi * 2.54
-                             : 0.0;
+    const double cm360 = main_game_cm360(setup);
     ui::kv("Distance per 360°", cm360 > 0 ? ui::fmt("%.1f cm", cm360) : "");
     ImGui::SameLine();
     ui::origin_badge(ui::Origin::Estimate);

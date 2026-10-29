@@ -20,8 +20,9 @@ shown once for the group.
 
 ### Test scene and mapping
 
-* FPS-style camera (yaw/pitch) with a fixed crosshair. One mouse count turns the view by
-  `0.07° × sensitivity`, which is VALORANT's mapping. Horizontal field of view 103° at 16:9.
+* FPS-style camera (yaw/pitch) with a fixed crosshair. One mouse count turns the view like your main game:
+  its published turn rate × sensitivity (VALORANT 0.07°, CS2 and Apex 0.022°, Overwatch 2 and Call of Duty
+  0.0066°), or for games without one, the cm/360 you enter. Horizontal field of view 103° at 16:9 (VALORANT's).
 * Input comes from Windows Raw Input on a dedicated thread, timestamped with `QueryPerformanceCounter`
   as each report arrives. Only one mouse is used per session (the one you pick, or the first that moves).
   Software-generated input (reports without a device handle, e.g. `SendInput`) and absolute-position

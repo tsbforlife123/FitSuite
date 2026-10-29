@@ -10,11 +10,11 @@ const std::vector<KnownGame>& known_shooters() {
     // per count at sensitivity 1. The others have FOV-dependent or unpublished scales, so FitSuite
     // asks for the turn distance (cm/360) instead of converting.
     static const std::vector<KnownGame> games = {
-        {"valorant-win64-shipping.exe", "VALORANT", 0.07},
-        {"cs2.exe", "Counter-Strike 2", 0.022},
-        {"r5apex.exe", "Apex Legends", 0.022},
-        {"r5apex_dx12.exe", "Apex Legends", 0.022},
-        {"overwatch.exe", "Overwatch 2", 0.0066},
+        {"valorant-win64-shipping.exe", "VALORANT", 0.07, "Settings → General → Mouse → Sensitivity: Aim"},
+        {"cs2.exe", "Counter-Strike 2", 0.022, "Settings → Keyboard / Mouse → Mouse Sensitivity"},
+        {"r5apex.exe", "Apex Legends", 0.022, "Settings → Mouse/Keyboard → Mouse Sensitivity"},
+        {"r5apex_dx12.exe", "Apex Legends", 0.022, "Settings → Mouse/Keyboard → Mouse Sensitivity"},
+        {"overwatch.exe", "Overwatch 2", 0.0066, "Options → Controls → Sensitivity"},
         {"fortniteclient-win64-shipping.exe", "Fortnite", 0.0},
         {"rainbowsix.exe", "Rainbow Six Siege", 0.0},
         {"rainbowsix_vulkan.exe", "Rainbow Six Siege", 0.0},
@@ -60,6 +60,23 @@ std::string game_display_name(const std::string& exe) {
         if (e == g.exe) return g.name;
     if (e.size() > 4 && e.compare(e.size() - 4, 4, ".exe") == 0) return e.substr(0, e.size() - 4);
     return e;
+}
+
+std::string main_game_exe(const std::string& game_id) {
+    if (game_id.empty() || game_id == "valorant") return "valorant-win64-shipping.exe";
+    return normalize_exe(game_id);
+}
+
+std::string game_id_for_exe(const std::string& exe) {
+    const std::string e = normalize_exe(exe);
+    return e == "valorant-win64-shipping.exe" ? std::string("valorant") : e;  // keeps existing fixes current
+}
+
+std::string game_sens_where(const std::string& exe) {
+    const std::string e = normalize_exe(exe);
+    for (const auto& g : known_shooters())
+        if (e == g.exe && g.sens_where) return std::string(g.name) + ": " + g.sens_where;
+    return "In " + game_display_name(e) + "'s settings, usually under Mouse or Controls.";
 }
 
 std::optional<bool> ActivationSwitcher::update(const std::string& foreground, const std::vector<std::string>& games,

@@ -1,5 +1,7 @@
 #include "doctest.h"
 #include "fit/game_activation.hpp"
+#include "fit/profile.hpp"
+#include "fit/serialize.hpp"
 
 using namespace fit;
 
@@ -87,4 +89,43 @@ TEST_CASE("turn distances convert between games with a known yaw") {
     CHECK(game_yaw("storygame.exe") == 0.0);
     CHECK(cm_per_360(0.0, 1.0, 800) == 0.0);
     CHECK(cm_per_360(0.022, 1.0, 0) == 0.0);
+}
+
+TEST_CASE("the main game: ids, where its sensitivity is, and what is recorded with a fix") {
+    // "valorant" (the only id before other games could be chosen) stays VALORANT, so existing fixes
+    // are not flagged as measured under other conditions.
+    CHECK(main_game_exe("valorant") == "valorant-win64-shipping.exe");
+    CHECK(main_game_exe("") == "valorant-win64-shipping.exe");
+    CHECK(game_id_for_exe("VALORANT-Win64-Shipping.exe") == "valorant");
+    CHECK(game_id_for_exe("cs2.exe") == "cs2.exe");
+    CHECK(main_game_exe(game_id_for_exe("cs2.exe")) == "cs2.exe");
+
+    CHECK(game_sens_where("cs2.exe").find("Counter-Strike 2: ") == 0);
+    CHECK(game_sens_where("valorant-win64-shipping.exe").find("Sensitivity: Aim") != std::string::npos);
+    CHECK(game_sens_where("fortniteclient-win64-shipping.exe").find("Fortnite's settings") != std::string::npos);
+    CHECK(game_sens_where("mygame.exe").find("mygame") != std::string::npos);
+
+    SetupProfile p = make_default_setup();
+    p.game.id = "cs2.exe";
+    p.game.sensitivity = 1.27;
+    Conditions c = conditions_for("mousefit", p);
+    CHECK(c.at("game.id") == "cs2.exe");
+    CHECK(c.count("game.sensitivity") == 1);
+    CHECK(c.count("game.cm360") == 0);
+    CHECK(describe_conditions(c).find("Counter-Strike 2") == 0);
+
+    // A game FitSuite cannot convert: the full-turn distance is what counts.
+    p.game.id = "fortniteclient-win64-shipping.exe";
+    p.game.cm360 = 38.5;
+    c = conditions_for("mousefit", p);
+    CHECK(c.count("game.sensitivity") == 0);
+    CHECK(c.at("game.cm360") == "38.5");
+    CHECK(describe_conditions(c).find("Fortnite") == 0);
+    CHECK(describe_conditions(c).find("38.5 cm/360") != std::string::npos);
+
+    std::vector<std::string> errs;
+    auto q = setup_from_json(to_json(p), errs);
+    REQUIRE(q);
+    CHECK(q->game.id == "fortniteclient-win64-shipping.exe");
+    CHECK(q->game.cm360 == doctest::Approx(38.5));
 }
