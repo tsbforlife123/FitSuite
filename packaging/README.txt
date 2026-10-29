@@ -1,12 +1,15 @@
-FitSuite 0.2.0 (preview) - mouse, frame and motion calibration for VALORANT
-==========================================================================
+FitSuite - mouse, frame and motion calibration
+==============================================
 
-PREVIEW: this build has been tested with simulated data but has not yet been run on a
-Windows PC. Please report anything that does not work as described.
+This build has been tested with simulated data but has not yet been run on a Windows PC.
+Please report anything that does not work as described.
 
 START
+  The easiest way is FitSuite-Setup.exe from github.com/tsbforlife123/FitSuite/releases:
+  it installs FitSuite for your account (no administrator rights), with shortcuts, and
+  adds Uninstall to Windows Settings > Apps. This zip is the portable version:
   1. Keep this folder anywhere you like (for example Documents\FitSuite).
-  2. Double-click FitSuite.exe. Nothing is installed and no administrator rights are needed.
+  2. Double-click FitSuite.exe. No administrator rights are needed.
   3. The build is not code-signed, so Windows may say "Windows protected your PC".
      Click "More info", then "Run anyway".
   4. The first time, a short setup asks for your mouse, checks your monitor, installs Raw
@@ -15,11 +18,11 @@ START
   Requirements: Windows 10 or 11, 64-bit, a graphics card with Direct3D 11.
 
 UPDATES
-  FitSuite checks github.com/tsbforlife123/FitSuite for a new version once a day (switch it
-  off in Settings > Updates). When there is one: Settings > Updates > "Download the update",
-  then "Update now". It is checked against its published SHA-256 before it is used, and your
-  settings and measurements stay as they are. No need to download a new zip.
-
+  FitSuite checks github.com/tsbforlife123/FitSuite for a new version each time it opens
+  (on by default; switch it off in Settings > Updates). When there is one, a box asks
+  "Update" or "Not now". The update is checked against its published SHA-256 before it is
+  used, and your settings and measurements stay as they are. What's new opens each time
+  FitSuite opens until you click "Don't show again".
 HOW IT WORKS
   One plain window with tabs, like Raw Accel, in light or dark. The Mouse tab has everything
   for the mouse fix on one screen: enter your DPI and VALORANT sensitivity, then

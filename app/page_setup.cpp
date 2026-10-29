@@ -112,6 +112,13 @@ void step_rawaccel(App& app) {
     const bool driver = app.rawaccel_installed();
     const fs::path folder = app.rawaccel_folder();
     std::error_code ec;
+    // Raw Accel writes settings.json only after its own Apply: FitSuite writes Raw Accel's defaults
+    // instead, so nothing has to be opened by hand.
+    static double tried_at = -10.0;  // at most every 5 s, in case Windows refuses the write
+    if (driver && !folder.empty() && !fs::is_regular_file(folder / "settings.json", ec) && ImGui::GetTime() - tried_at > 5.0) {
+        tried_at = ImGui::GetTime();
+        app.rawaccel_settings_ready();
+    }
     const bool has_settings = !folder.empty() && fs::is_regular_file(folder / "settings.json", ec);
     ui::wrapped("Raw Accel is a free, signed, open-source mouse driver (MIT licence). FitSuite uses it to apply your fix "
                 "in games; its FAQ says it has been working in VALORANT matches (FitSuite has not verified that). You can "
@@ -201,11 +208,11 @@ void step_startup(App& app) {
               "nothing.");
     ImGui::Dummy(ImVec2(0, 6));
     bool up = st.update_check;
-    if (ImGui::Checkbox("Check for updates when FitSuite opens", &up)) {
+    if (ImGui::Checkbox("Check for updates automatically", &up)) {
         st.update_check = up;
         app.save();
     }
-    ui::faint("FitSuite asks GitHub (github.com/%s) for the latest release. Nothing about you is sent. Updates install only "
+    ui::faint("Each time FitSuite opens, FitSuite asks GitHub (github.com/%s) for the latest release. Nothing about you is sent. Updates install only "
               "when you click Update, and only if they match their published checksum.",
               kUpdateRepo);
 }

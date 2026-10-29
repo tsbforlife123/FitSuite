@@ -6,6 +6,7 @@
 #include <cmath>
 #include <thread>
 
+#include "fit/game_activation.hpp"
 #include "fit/mouse_schedule.hpp"
 #include "fit/rawaccel_export.hpp"
 #include "fit/timeutil.hpp"
@@ -417,18 +418,21 @@ void App::on_mouse_test_done() {
             for (auto& x : setup_.mouse_profiles)
                 if (x.status == "active") x.status = "candidate";
             m->status = "active";
+            // At least the main game, so the fix has somewhere to switch on.
+            if (setup_.fix_games.games.empty()) setup_.fix_games.games.push_back(main_game_exe(setup_.game.id));
             save_now();
-            const std::filesystem::path sj = rawaccel_settings_path();
-            std::string msg;
+            std::string msg, made;
+            const std::filesystem::path sj = rawaccel_installed() ? rawaccel_settings_ready(&made) : std::filesystem::path();
             if (!rawaccel_installed())
                 toast(ui::Tone::Good, "Your fix passed. Install Raw Accel (Settings → About → Run the setup again) to use it in your games.", 10.0);
             else if (sj.empty())
-                toast(ui::Tone::Good, "Your fix passed. Click \"Turn on\" on the Mouse tab to use it in your games.", 10.0);
+                toast(ui::Tone::Warn, "Your fix passed, but Raw Accel's folder was not found. Click \"Turn on\" on the Mouse tab "
+                                      "and choose settings.json in your Raw Accel folder.", 12.0);
             else if (games_turn_on(sj, &msg))
                 toast(ui::Tone::Good, "Your fix passed and is now on in your games.", 10.0);
             else
                 toast(ui::Tone::Warn, "Your fix passed, but it could not be switched on: " + msg, 10.0);
-            mouse.patch_message = msg;
+            mouse.patch_message = made.empty() ? msg : msg.empty() ? made : made + " " + msg;
         }
     }
     save();
@@ -602,10 +606,10 @@ std::vector<App::DiagItem> App::check_setup() {
     rawaccel_installed_ = driver;
     rawaccel_checked_at_ = clock_s();
     add(driver, "Raw Accel driver", driver ? "Installed." : "Not installed. It is needed to use your fix in games.");
-    const fs::path sj = rawaccel_settings_path();
+    const fs::path sj = driver ? rawaccel_settings_ready() : rawaccel_settings_path();
     std::error_code ec;
     if (sj.empty()) {
-        add(false, "Raw Accel settings.json", "Not chosen yet. FitSuite asks for it the first time you turn the fix on.");
+        add(false, "Raw Accel settings.json", "Raw Accel's folder was not found. FitSuite asks for it the first time you turn the fix on.");
     } else {
         std::string err;
         auto text = read_file(sj, &err, 8u << 20);
@@ -812,13 +816,13 @@ void App::draw_status_bar() {
     field(fix, fix_color);
     field(rawaccel_installed() ? "Raw Accel: installed" : "Raw Accel: not installed", kTextMuted);
     if ((updater.step == Updater::Step::Available || updater.step == Updater::Step::Ready) && updater.release)
-        field(("Update " + updater.release->tag + " available (Settings)").c_str(), kAccent);
+        field(("Version " + updater.release->version_text() + " available (Settings)").c_str(), kAccent);
 
     // The newest message, if it has not expired.
     const double now = time();
     toasts_.erase(std::remove_if(toasts_.begin(), toasts_.end(), [&](const Toast& t) { return t.until < now; }), toasts_.end());
     const std::string right_text = platform_.dev_harness() ? std::string("DEVELOPMENT HARNESS · simulated input")
-                                                            : std::string("Preview ") + kAppVersion + " · local only";
+                                                            : std::string("Local only");
     const char* right = right_text.c_str();
     // "What's new" sits just left of the version, and reopens this version's notes.
     const char* notes_link = "What's new";

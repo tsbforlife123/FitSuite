@@ -257,6 +257,11 @@ public:
     bool startup_blocked();
     // The Raw Accel settings.json the player chose (remembered between runs); empty if none.
     std::filesystem::path rawaccel_settings_path();
+    // The settings.json the fix goes into: the remembered one, else the one in Raw Accel's folder. When
+    // Raw Accel has not saved one yet, FitSuite writes Raw Accel's own defaults there (so the fix can be
+    // used without opening Raw Accel first) and says so in *note. Empty only when no Raw Accel folder
+    // is found on this PC.
+    std::filesystem::path rawaccel_settings_ready(std::string* note = nullptr);
     void remember_rawaccel_settings_path(const std::filesystem::path& p);
 
     // Settings → Check my setup.
@@ -327,8 +332,10 @@ private:
     void tick_ra_install();
     void tick_updater();
     void draw_update_prompt();
-    void draw_whats_new();  // this version's notes, once after an update
-    bool whats_new_open_ = false;  // reopened with "What's new" in the status bar
+    void draw_whats_new();  // this version's notes, each time FitSuite opens until "Don't show again"
+    bool whats_new_showing();
+    bool whats_new_open_ = false;    // opened with "What's new" in the status bar
+    bool whats_new_closed_ = false;  // closed for this launch
     bool checked_this_launch_ = false;  // updates are checked once each time FitSuite opens
     double rawaccel_folder_checked_at_ = -100.0;
     std::filesystem::path rawaccel_folder_cache_;  // shutdown() ran (on exit, or when Windows ends the session)
