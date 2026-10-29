@@ -13,7 +13,7 @@ namespace fit {
 struct TrackingResult {
     bool ok = false;
     int samples = 0;
-    double on_target_pct = 0.0;   // share of time the crosshair was on the target
+    double on_target_pct = 0.0;   // share of time the crosshair was on the target or its trail (kTrackTrailMs)
     double mean_error_deg = 0.0;  // average distance from the target centre
     // How far behind the target the crosshair stays while it moves steadily, as time (distance
     // behind along the target's path ÷ its speed), by the direction the target was moving (0 = right,

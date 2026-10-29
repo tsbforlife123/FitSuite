@@ -108,6 +108,7 @@ private:
                            const char* secondary, bool* primary_clicked, bool* secondary_clicked);
     std::string round_title(int index) const;
     std::string round_body(int index) const;
+    bool returning_round(int index) const;  // calibration flick round after the first: "Returning flicks"
     const fit::Transform& active_transform() const;
 
     IPlatform& platform_;
@@ -144,7 +145,14 @@ private:
 
     // Tracking rounds.
     double tk_yaw_ = 0, tk_pitch_ = 0, tk_vy_ = 0, tk_vp_ = 0;
-    int64_t tk_next_turn_us_ = 0, tk_last_us_ = 0, tk_played_us_ = 0;
+    fit::TrackMotion tk_motion_;
+    struct TrailPoint {
+        int64_t t_us;
+        double yaw, pitch;
+    };
+    std::vector<TrailPoint> tk_trail_;  // where the target was over the last fit::kTrackTrailMs
+    bool track_on_target() const;       // on the target or its trail
+    int64_t tk_last_us_ = 0, tk_played_us_ = 0;
     double tk_on_s_ = 0.0, tk_total_s_ = 0.0;
 
     size_t scored_done_ = 0, scored_total_ = 0;

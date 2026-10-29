@@ -16,6 +16,23 @@ size_t Plan::scored_trials() const {
     return n;
 }
 
+void TrackMotion::step(double t_s, double dt, Rng& rng) {
+    if (t_s >= next_turn_s) {
+        const double a = rng.uniform(0.0, kTwoPi), sp = rng.uniform(kMinSpeed, kMaxSpeed);
+        goal_vyaw = sp * std::cos(a);
+        goal_vpitch = sp * std::sin(a);
+        next_turn_s = t_s + rng.uniform(kMinTurnS, kMaxTurnS);
+    }
+    const double k = 1.0 - std::exp(-std::max(dt, 0.0) / kEaseS);
+    vyaw += (goal_vyaw - vyaw) * k;
+    vpitch += (goal_vpitch - vpitch) * k;
+    // Bounce off the edges of the box (the goal turns round too, so the easing does not push back out).
+    if (std::fabs(yaw + vyaw * dt) > kBoxYaw) vyaw = -vyaw, goal_vyaw = -goal_vyaw;
+    if (std::fabs(pitch + vpitch * dt) > kBoxPitch) vpitch = -vpitch, goal_vpitch = -goal_vpitch;
+    yaw += vyaw * dt;
+    pitch += vpitch * dt;
+}
+
 std::vector<TargetSpec> out_and_back(const std::vector<TargetSpec>& outward) {
     std::vector<TargetSpec> out;
     out.reserve(outward.size() * 2);

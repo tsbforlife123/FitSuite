@@ -18,8 +18,7 @@ using namespace fit;
 namespace {
 // Switching targets appear within this box around the round's centre (degrees).
 constexpr double kSwitchYaw = 18.0, kSwitchPitch = 9.0;
-// Tracking: the target wanders within this box at 8–30°/s, changing course every 0.6–1.4 s.
-constexpr double kTrackYaw = 15.0, kTrackPitch = 8.0;
+// Tracking: the target's movement is fit::TrackMotion (mouse_schedule.hpp).
 }  // namespace
 
 MouseTest::MouseTest(IPlatform& platform, MouseTestConfig cfg)
@@ -184,7 +183,8 @@ void MouseTest::play(int64_t now) {
         if (task == Task::Track) {
             tk_yaw_ = tk_pitch_ = 0.0;
             tk_vy_ = tk_vp_ = 0.0;
-            tk_next_turn_us_ = now;
+            tk_motion_ = fit::TrackMotion{};
+            tk_trail_.clear();
             tk_last_us_ = now;
         } else if (task == Task::Switch) {
             const int start = std::min(info().visible_targets, info().kills);
@@ -327,23 +327,31 @@ void MouseTest::update_switch(int64_t now) {
     }
 }
 
+bool MouseTest::track_on_target() const {
+    const double r = info().radius_deg;
+    if (angular_distance_deg(cam_.yaw_deg, cam_.pitch_deg, tk_yaw_, tk_pitch_) <= r) return true;
+    for (const auto& p : tk_trail_)
+        if (angular_distance_deg(cam_.yaw_deg, cam_.pitch_deg, p.yaw, p.pitch) <= r) return true;
+    return false;
+}
+
 void MouseTest::update_track(int64_t now) {
     const double dt = std::clamp(double(now - tk_last_us_) / 1e6, 0.0, 0.05);
     tk_last_us_ = now;
-    if (now >= tk_next_turn_us_) {
-        const double a = rng_.uniform(0.0, 2.0 * kPi), sp = rng_.uniform(8.0, 30.0);
-        tk_vy_ = sp * std::cos(a);
-        tk_vp_ = sp * std::sin(a);
-        tk_next_turn_us_ = now + int64_t(rng_.uniform(0.6, 1.4) * 1e6);
-    }
-    if (std::fabs(tk_yaw_ + tk_vy_ * dt - anchor_yaw_) > kTrackYaw) tk_vy_ = -tk_vy_;
-    if (std::fabs(tk_pitch_ + tk_vp_ * dt - anchor_pitch_) > kTrackPitch) tk_vp_ = -tk_vp_;
-    tk_yaw_ += tk_vy_ * dt;
-    tk_pitch_ += tk_vp_ * dt;
+    tk_motion_.step(double(tk_played_us_) / 1e6, dt, rng_);
+    tk_yaw_ = anchor_yaw_ + tk_motion_.yaw;
+    tk_pitch_ = anchor_pitch_ + tk_motion_.pitch;
+    tk_vy_ = tk_motion_.vyaw;
+    tk_vp_ = tk_motion_.vpitch;
+    // The trail: where the target was over the last kTrackTrailMs (the newest point is the target).
+    tk_trail_.push_back({now, tk_yaw_, tk_pitch_});
+    const int64_t keep_from = now - int64_t(kTrackTrailMs * 1000.0);
+    size_t old = 0;
+    while (old < tk_trail_.size() && tk_trail_[old].t_us < keep_from) ++old;
+    tk_trail_.erase(tk_trail_.begin(), tk_trail_.begin() + std::ptrdiff_t(old));
     const double r = info().radius_deg;
-    const double e = angular_distance_deg(cam_.yaw_deg, cam_.pitch_deg, tk_yaw_, tk_pitch_);
     tk_total_s_ += dt;
-    if (e <= r) tk_on_s_ += dt;
+    if (track_on_target()) tk_on_s_ += dt;
     if (round_ >= 0) {
         TrackSample s;
         s.t_us = now;
@@ -505,7 +513,18 @@ std::string MouseTest::round_title(int index) const {
     const Task t = cfg_.plan.block_info[size_t(index)].task;
     if (cfg_.kind == SessionKind::Validation) return ui::fmt("Block %d of %d", index + 1, round_count());
     if (cfg_.kind == SessionKind::Check) return ui::fmt("Quick check · round %d of %d", index + 1, round_count());
-    return ui::fmt("Round %d of %d · %s", index + 1, round_count(), task_title(t));
+    return ui::fmt("Round %d of %d · %s", index + 1, round_count(), returning_round(index) ? "Returning flicks" : task_title(t));
+}
+
+// A calibration's second (and any later) flick round: flick out to a target, then back to the dot in
+// the middle. The rounds are played the same way; the name tells them apart.
+bool MouseTest::returning_round(int index) const {
+    if (cfg_.kind != SessionKind::Calibration || index <= 0) return false;
+    const auto& infos = cfg_.plan.block_info;
+    if (size_t(index) >= infos.size() || infos[size_t(index)].task != Task::Flick) return false;
+    for (int i = 0; i < index; ++i)
+        if (infos[size_t(i)].task == Task::Flick) return true;
+    return false;
 }
 
 std::string MouseTest::round_body(int index) const {
@@ -513,6 +532,10 @@ std::string MouseTest::round_body(int index) const {
     const double secs = bi.target_timeout_ms / 1000.0;
     switch (bi.task) {
         case Task::Flick:
+            if (returning_round(index))
+                return ui::fmt("Flick to the target, then flick back to the dot in the middle. One shot each; the next "
+                               "target appears the moment you hit or miss, and each one disappears after %.1f s.",
+                               secs);
             return ui::fmt("Shoot each target. The next one appears the moment you hit or miss, and each target "
                            "disappears after %.1f s. Flick at your normal in-game speed: quick but accurate.",
                            secs);
@@ -640,8 +663,23 @@ void MouseTest::frame(ImVec2 origin, ImVec2 size) {
                              theme::rgb(theme::kSceneAccent, 0.9f));
             }
         } else if (task == Task::Track) {
-            const bool on = angular_distance_deg(cam_.yaw_deg, cam_.pitch_deg, tk_yaw_, tk_pitch_) <= info().radius_deg;
-            r.draw_target(tk_yaw_, tk_pitch_, info().radius_deg, theme::rgb(on ? theme::kSceneGood : theme::kTarget));
+            const bool on = track_on_target();
+            // The trail: faint copies of the target where it was, fading out with age. Aiming at it
+            // still counts as on target. Spaced at least a fifth of the radius apart, so a high frame
+            // rate does not draw hundreds of them.
+            const double rad = info().radius_deg;
+            double last_y = 0.0, last_p = 0.0;
+            bool drew = false;
+            for (size_t i = 0; i + 1 < tk_trail_.size(); ++i) {
+                const auto& p = tk_trail_[i];
+                if (drew && angular_distance_deg(p.yaw, p.pitch, last_y, last_p) < rad * 0.2) continue;
+                drew = true;
+                last_y = p.yaw, last_p = p.pitch;
+                const double age = double(now - p.t_us) / (kTrackTrailMs * 1000.0);
+                const float alpha = float(0.18 * std::clamp(1.0 - age, 0.0, 1.0));
+                r.draw_target(p.yaw, p.pitch, rad, theme::rgb(on ? theme::kSceneGood : theme::kTarget, alpha));
+            }
+            r.draw_target(tk_yaw_, tk_pitch_, rad, theme::rgb(on ? theme::kSceneGood : theme::kTarget));
         }
     }
     if (now < flash_until_us_)
