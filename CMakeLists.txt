@@ -72,6 +72,17 @@ if(FITSUITE_BUILD_APP OR FITSUITE_BUILD_HARNESS)
             ${CMAKE_CURRENT_SOURCE_DIR}/assets/fonts/IBMPlexMono-Medium.ttf
     COMMENT "Embedding fonts")
 
+  # This version's release notes (docs/releases/v<version>.md) are built in, for the "What's new" box.
+  set(NOTES_MD ${CMAKE_CURRENT_SOURCE_DIR}/docs/releases/v${PROJECT_VERSION}.md)
+  set(FITSUITE_RELEASE_NOTES "")
+  if(EXISTS ${NOTES_MD})
+    file(READ ${NOTES_MD} FITSUITE_RELEASE_NOTES)
+    string(STRIP "${FITSUITE_RELEASE_NOTES}" FITSUITE_RELEASE_NOTES)
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${NOTES_MD})
+  endif()
+  set(NOTES_SRC ${CMAKE_CURRENT_BINARY_DIR}/release_notes.cpp)
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/cmake/release_notes.cpp.in ${NOTES_SRC} @ONLY)
+
   # ---- app: UI pages, session flows and test scenes (platform independent) ----------------------
   add_library(fitapp STATIC
     app/app.cpp
@@ -89,6 +100,7 @@ if(FITSUITE_BUILD_APP OR FITSUITE_BUILD_HARNESS)
     app/motion_test.cpp
     app/scene.cpp
     ${FONT_SRC}
+    ${NOTES_SRC}
   )
   target_include_directories(fitapp PUBLIC app)
   target_link_libraries(fitapp PUBLIC fitcore imgui)

@@ -486,7 +486,8 @@ json to_json(const SetupProfile& p) {
                 {"rawaccel_install_pending", p.app.rawaccel_install_pending},
                 {"update_check", p.app.update_check},
                 {"last_update_check_utc", p.app.last_update_check_utc},
-                {"update_notified", p.app.update_notified}};
+                {"update_notified", p.app.update_notified},
+                {"notes_seen", p.app.notes_seen}};
 
     json rs = json::array();
     for (const auto& r : p.results)
@@ -722,6 +723,8 @@ std::optional<SetupProfile> setup_from_json(const json& j, std::vector<std::stri
         p.app.update_check = ap.flag("update_check", true);
         p.app.last_update_check_utc = ap.str("last_update_check_utc", "", false, 64);
         p.app.update_notified = ap.str("update_notified", "", false, 64);
+        // Files from earlier versions have none: their players see the new version's notes once.
+        p.app.notes_seen = ap.str("notes_seen", "", false, 64);
         if (const json* rk = ap.array_raw("refresh_kept"))
             for (const auto& e : *rk)
                 if (e.is_string() && !e.get<std::string>().empty() && e.get<std::string>().size() <= 300 &&

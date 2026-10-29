@@ -327,12 +327,16 @@ private:
     void tick_ra_install();
     void tick_updater();
     void draw_update_prompt();
+    void draw_whats_new();  // this version's notes, once after an update
     bool checked_this_launch_ = false;  // updates are checked once each time FitSuite opens
     double rawaccel_folder_checked_at_ = -100.0;
     std::filesystem::path rawaccel_folder_cache_;  // shutdown() ran (on exit, or when Windows ends the session)
     bool autostart_blocked_ = false;
     double autostart_blocked_at_ = -1.0;
 };
+
+// This version's release notes (docs/releases/v<version>.md, built in by CMake); may be empty.
+extern const char* const kReleaseNotes;
 
 // Pages. The main pages are the simple views for every player; Nerd stats holds the detailed views
 // (every statistic and control) of each tool.
