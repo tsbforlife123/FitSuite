@@ -126,6 +126,10 @@ TEST_CASE("settings, mouse model and the last quick check round-trip; old files 
     p.app.rawaccel_install_pending = true;
     p.app.update_check = false;
     p.app.notes_hidden = "0.2.1";
+    p.app.auto_install_updates = true;
+    p.app.pending_update_exe = "C:/x/update/FitSuite-v1.0.1.exe";
+    p.app.pending_update_sha = std::string(64, 'a');
+    p.app.pending_update_version = "1.0.1";
     MouseProfileRecord m;
     m.id = "mp1";
     m.label = "fix";
@@ -155,6 +159,10 @@ TEST_CASE("settings, mouse model and the last quick check round-trip; old files 
     CHECK(q->app.rawaccel_install_pending);
     CHECK_FALSE(q->app.update_check);
     CHECK(q->app.notes_hidden == "0.2.1");
+    CHECK(q->app.auto_install_updates);
+    CHECK(q->app.pending_update_exe == "C:/x/update/FitSuite-v1.0.1.exe");
+    CHECK(q->app.pending_update_sha == std::string(64, 'a'));
+    CHECK(q->app.pending_update_version == "1.0.1");
     REQUIRE(q->mouse_profiles.back().last_check);
     CHECK(q->mouse_profiles.back().last_check->verdict == "still_fits");
 
@@ -175,7 +183,8 @@ TEST_CASE("settings, mouse model and the last quick check round-trip; old files 
     CHECK(o->app.check_reminder_days == 7);
     CHECK(o->app.setup_done == !o->mouse_sessions.empty());  // only players who already measured skip the setup
     CHECK(o->app.update_check);
-    CHECK(o->app.notes_hidden.empty());  // the notes show until the player clicks "Don't show again"
+    CHECK(o->app.notes_hidden.empty());
+    CHECK_FALSE(o->app.auto_install_updates);  // asks Update / Not now unless the player chose otherwise  // the notes show until the player clicks "Don't show again"
 
     json bad = to_json(p);
     bad["app"]["theme"] = "neon";  // unknown theme falls back to following Windows

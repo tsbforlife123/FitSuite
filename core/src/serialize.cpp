@@ -511,7 +511,11 @@ json to_json(const SetupProfile& p) {
                 {"update_check", p.app.update_check},
                 {"last_update_check_utc", p.app.last_update_check_utc},
                 {"update_notified", p.app.update_notified},
-                {"notes_hidden", p.app.notes_hidden}};
+                {"notes_hidden", p.app.notes_hidden},
+                {"auto_install_updates", p.app.auto_install_updates},
+                {"pending_update_exe", p.app.pending_update_exe},
+                {"pending_update_sha", p.app.pending_update_sha},
+                {"pending_update_version", p.app.pending_update_version}};
 
     json rs = json::array();
     for (const auto& r : p.results)
@@ -750,6 +754,10 @@ std::optional<SetupProfile> setup_from_json(const json& j, std::vector<std::stri
         p.app.update_notified = ap.str("update_notified", "", false, 64);
         // "Don't show again" for one version; a new version's notes show again.
         p.app.notes_hidden = ap.str("notes_hidden", "", false, 64);
+        p.app.auto_install_updates = ap.flag("auto_install_updates", false);
+        p.app.pending_update_exe = ap.str("pending_update_exe", "", false, 1024);
+        p.app.pending_update_sha = ap.str("pending_update_sha", "", false, 64);
+        p.app.pending_update_version = ap.str("pending_update_version", "", false, 64);
         if (const json* rk = ap.array_raw("refresh_kept"))
             for (const auto& e : *rk)
                 if (e.is_string() && !e.get<std::string>().empty() && e.get<std::string>().size() <= 300 &&

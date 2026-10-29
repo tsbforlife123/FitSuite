@@ -337,6 +337,8 @@ private:
     bool whats_new_open_ = false;    // opened with "What's new" in the status bar
     bool whats_new_closed_ = false;  // closed for this launch
     bool checked_this_launch_ = false;  // updates are checked once each time FitSuite opens
+    bool pending_update_tried_ = false; // an update waiting from last time is installed once, at start
+    bool install_pending_update();
     double rawaccel_folder_checked_at_ = -100.0;
     std::filesystem::path rawaccel_folder_cache_;  // shutdown() ran (on exit, or when Windows ends the session)
     bool autostart_blocked_ = false;

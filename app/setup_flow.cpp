@@ -235,8 +235,44 @@ std::string App::take_update_notice() {
     return "FitSuite version " + updater.release->version_text() + " is available. Open FitSuite to update.";
 }
 
+// "Install updates by themselves": the update downloaded and checked last time is installed now, as
+// FitSuite opens (before any game or test can start). Tried once: a failure is reported and the
+// normal check runs instead.
+bool App::install_pending_update() {
+    auto& a = setup_.app;
+    if (a.pending_update_exe.empty()) return false;
+    const fs::path exe = a.pending_update_exe;
+    const std::string sha = a.pending_update_sha;
+    const Version v = parse_version(a.pending_update_version);
+    a.pending_update_exe.clear();
+    a.pending_update_sha.clear();
+    a.pending_update_version.clear();
+    save_now();
+    std::error_code ec;
+    if (!a.auto_install_updates || platform_.dev_harness() || !v.ok || compare_versions(v, parse_version(kAppVersion)) <= 0) {
+        fs::remove(exe, ec);  // switched off since, or already this version
+        return false;
+    }
+    const auto h = sha256_file(exe);
+    if (!h || *h != sha) {
+        fs::remove(exe, ec);
+        return false;
+    }
+    std::string err;
+    if (platform_.apply_update(exe, &err)) {
+        platform_.request_quit();
+        return true;
+    }
+    toast(ui::Tone::Warn, "The update could not be installed: " + err, 10.0);
+    return false;
+}
+
 void App::tick_updater() {
     auto& u = updater;
+    if (!pending_update_tried_) {
+        pending_update_tried_ = true;
+        if (install_pending_update()) return;
+    }
     // Checked every time FitSuite opens, and again once a day while it keeps running (in the
     // notification area, say), when the player switched it on. The harness never goes online by itself.
     if (!u.token && setup_.app.update_check && !platform_.dev_harness() &&
@@ -268,6 +304,18 @@ void App::tick_updater() {
         u.release = rel;
         if (compare_versions(rel->version, parse_version(kAppVersion)) > 0) {
             u.step = Updater::Step::Available;
+            if (setup_.app.auto_install_updates && setup_.app.setup_done) {
+                // Downloaded and checked now, installed the next time FitSuite opens.
+                std::error_code e2;
+                if (setup_.app.pending_update_version == rel->version_text() &&
+                    fs::is_regular_file(setup_.app.pending_update_exe, e2)) {
+                    u.exe = setup_.app.pending_update_exe;
+                    u.step = Updater::Step::Ready;
+                } else {
+                    update_download();
+                }
+                return;
+            }
             // Normally the "Update available" box asks; during the first-run setup a short note does.
             if (!setup_.app.setup_done) toast(ui::Tone::Info, "Version " + rel->version_text() + " is available: Settings → Updates.", 10.0);
         } else {
@@ -312,6 +360,12 @@ void App::tick_updater() {
             return;
         }
         u.step = Updater::Step::Ready;
+        if (setup_.app.auto_install_updates && !u.install_when_ready && u.release) {
+            setup_.app.pending_update_exe = u.exe.string();
+            setup_.app.pending_update_sha = u.expected_sha;
+            setup_.app.pending_update_version = u.release->version_text();
+            save();
+        }
     }
 }
 
@@ -322,6 +376,7 @@ void App::tick_updater() {
 void App::draw_update_prompt() {
     auto& u = updater;
     if (!setup_.app.setup_done || u.prompt_dismissed || !u.release || mouse.test || motion.test) return;
+    if (setup_.app.auto_install_updates && !u.install_when_ready) return;  // it installs at the next start
     if (whats_new_showing()) return;  // "What's new" first
     const bool working = u.install_when_ready;  // the player clicked Update
     if (!working && u.step != Updater::Step::Available) return;

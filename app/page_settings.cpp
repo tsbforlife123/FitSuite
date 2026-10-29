@@ -343,6 +343,17 @@ void updates(App& app, float w) {
     }
     ui::faint("On by default: each time FitSuite opens, and once a day while it runs. From FitSuite's public releases "
               "(github.com/%s). Nothing about you is sent.", fit::kUpdateRepo);
+    ImGui::BeginDisabled(!st.update_check);
+    bool ai = st.auto_install_updates;
+    if (ImGui::Checkbox("Install updates by themselves", &ai)) {
+        st.auto_install_updates = ai;
+        app.save();
+    }
+    ImGui::EndDisabled();
+    ui::faint(st.auto_install_updates
+                  ? "A new version is downloaded and checked in the background and installed the next time FitSuite opens, "
+                    "never while it runs."
+                  : "Off: FitSuite asks Update or Not now when there is a new version.");
     ImGui::Dummy(ImVec2(0, 2));
     using S = Updater::Step;
     switch (u.step) {
@@ -378,6 +389,7 @@ void updates(App& app, float w) {
         }
         case S::Ready: {
             ImGui::TextColored(theme::v4(theme::kGood), "Version %s downloaded and checked.", u.release ? u.release->version_text().c_str() : "");
+            if (st.auto_install_updates) ui::faint("It installs by itself the next time FitSuite opens, or now:");
             if (ui::button_primary("Update now (FitSuite restarts)")) app.update_install();
             ImGui::SameLine(0, 12);
             ui::faint("Your settings and measurements stay as they are.");
