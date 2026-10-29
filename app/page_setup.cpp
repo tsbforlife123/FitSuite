@@ -57,13 +57,7 @@ bool step_mouse(App& app) {
             ImGui::TableNextColumn();
         };
         row("Mouse model");
-        ImGui::SetNextItemWidth(320);
-        if (ImGui::InputTextWithHint("##model", "e.g. Logitech G Pro X Superlight 2", app.model_input, sizeof app.model_input)) {
-            std::string m = app.model_input;
-            while (!m.empty() && m.back() == ' ') m.pop_back();
-            setup.mouse.model = m;
-            app.save();
-        }
+        mouse_model_field(app, 320);
         if (!setup.mouse.name.empty()) {
             row("");
             ui::faint("Detected: %s", setup.mouse.name.c_str());

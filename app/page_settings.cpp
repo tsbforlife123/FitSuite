@@ -5,6 +5,7 @@
 
 #include "app.hpp"
 #include "fit/game_activation.hpp"
+#include "fit/mouse_db.hpp"
 #include "fit/timeutil.hpp"
 #include "fit/update.hpp"
 #include "imgui.h"
@@ -65,13 +66,7 @@ void mouse(App& app, float w) {
     ui::card_title("Your mouse");
     if (begin_rows("##mouse")) {
         row("Mouse model");
-        ImGui::SetNextItemWidth(std::min(320.0f, w - kLabelW - 40.0f));
-        if (ImGui::InputTextWithHint("##model", "e.g. Logitech G Pro X Superlight 2", app.model_input, sizeof app.model_input)) {
-            std::string m = app.model_input;
-            while (!m.empty() && m.back() == ' ') m.pop_back();
-            setup.mouse.model = m;
-            app.save();
-        }
+        mouse_model_field(app, std::min(320.0f, w - kLabelW - 40.0f));
         if (!setup.mouse.name.empty() || !setup.mouse.vid_pid.empty()) {
             row("");
             ui::faint("Detected: %s%s%s", setup.mouse.name.c_str(), setup.mouse.vid_pid.empty() ? "" : "  ",
@@ -369,6 +364,57 @@ void about(App& app, float w) {
 }
 
 }  // namespace
+
+void mouse_model_field(App& app, float width) {
+    auto& setup = app.setup();
+    if (!app.model_input_loaded) {
+        std::snprintf(app.model_input, sizeof app.model_input, "%s", setup.mouse.model.c_str());
+        app.model_input_loaded = true;
+    }
+    auto set_model = [&](const std::string& m) {
+        setup.mouse.model = m;
+        std::snprintf(app.model_input, sizeof app.model_input, "%s", m.c_str());
+        app.save();
+    };
+    ImGui::SetNextItemWidth(width);
+    if (ImGui::InputTextWithHint("##model", "e.g. Logitech G Pro X Superlight 2", app.model_input, sizeof app.model_input)) {
+        std::string m = app.model_input;
+        while (!m.empty() && m.back() == ' ') m.pop_back();
+        setup.mouse.model = m;
+        app.save();
+    }
+    const KnownMouse* known = find_mouse(setup.mouse.model);
+    if (!known) {
+        // Matches from the list, as plain lines to click (no pop-up).
+        const auto matches = search_mice(app.model_input);
+        for (const KnownMouse* m : matches) {
+            ImGui::PushID(m);
+            if (ImGui::Selectable(m->full_name().c_str(), false, 0, ImVec2(width, 0))) set_model(m->full_name());
+            ImGui::PopID();
+        }
+        if (matches.empty() && std::strlen(app.model_input) >= 3)
+            ui::faint("Not in FitSuite's list of %d mice: that is fine, the test works with any mouse.", int(known_mice().size()));
+        return;
+    }
+    // Published specs of the chosen mouse, and anything that does not fit them.
+    std::string specs;
+    auto add = [&](const std::string& s) { specs += (specs.empty() ? "" : " · ") + s; };
+    if (!known->sensor.empty()) add(known->sensor + " sensor");
+    if (!known->dpi_steps.empty()) {
+        std::string st;
+        for (int s : known->dpi_steps) st += (st.empty() ? "" : "/") + std::to_string(s);
+        add(st + " DPI");
+    } else if (known->max_dpi > 0) {
+        add(known->min_dpi > 0 ? ui::fmt("%d–%d DPI", known->min_dpi, known->max_dpi) : ui::fmt("up to %d DPI", known->max_dpi));
+    }
+    if (known->max_polling_hz > 0) add(ui::fmt("up to %d Hz", known->max_polling_hz));
+    ui::faint("%s", specs.c_str());
+    if (!known->polling_note.empty()) ui::faint("%s", known->polling_note.c_str());
+    ui::faint("Specs from %s (checked %s).", known->source.c_str(), known->checked.c_str());
+    const MouseAdvice adv = mouse_advice(*known, setup.mouse.dpi, setup.mouse.polling_hz);
+    for (const auto& w : adv.warnings) ui::wrapped(w.c_str(), theme::kWarn);
+    for (const auto& n : adv.notes) ui::faint("%s", n.c_str());
+}
 
 void page_settings(App& app) {
     ui::page_header("Settings", "How FitSuite looks, your mouse, and how it runs in the background.");
