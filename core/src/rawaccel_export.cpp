@@ -142,6 +142,61 @@ std::optional<RawAccelPatchResult> patch_rawaccel_settings(std::string_view text
     const double new_dpi = existing_dpi * corr_sens * sens_from_fit;
     (*prof)[kDPI] = std::round(new_dpi * 100.0) / 100.0;
     r.written.sens = new_dpi / 1000.0;
+
+    // The speed part: Raw Accel's lookup-table acceleration in sensitivity mode ("Gain / Velocity"
+    // off), in the whole/horizontal accel parameters (used for all movement in Raw Accel's default
+    // "whole" mode).
+    if (!correction.speed.empty()) {
+        const bool other_accel = !mx.empty() && mx != "noaccel";
+        if (other_accel || !prof->contains(kAccelX) || !(*prof)[kAccelX].is_object()) {
+            r.warnings.push_back("The speed part of your fix was left out: this Raw Accel profile already uses its own "
+                                 "acceleration, and FitSuite does not combine the two.");
+        } else {
+            // With a DPI set for the device, Raw Accel measures speed in inches per second instead of
+            // counts per millisecond.
+            const char* kDevDpi = "DPI (normalizes input speed unit: counts/ms -> in/s)";
+            double dev_dpi = 0.0;
+            if (j.contains("defaultDeviceConfig") && j["defaultDeviceConfig"].is_object() &&
+                j["defaultDeviceConfig"].contains(kDevDpi) && j["defaultDeviceConfig"][kDevDpi].is_number())
+                dev_dpi = j["defaultDeviceConfig"][kDevDpi].get<double>();
+            if (j.contains("devices") && j["devices"].is_array())
+                for (const auto& d : j["devices"])
+                    if (d.is_object() && d.contains("config") && d["config"].is_object() && d["config"].contains(kDevDpi) &&
+                        d["config"][kDevDpi].is_number() && d["config"][kDevDpi].get<double>() != dev_dpi)
+                        r.warnings.push_back("A mouse has its own DPI setting in Raw Accel; the speed part of your fix "
+                                             "assumes the default device settings.");
+            const double to_unit = dev_dpi > 0.0 ? 1000.0 / dev_dpi : 1.0;
+            json data = json::array();
+            for (const auto& [x, y] : correction.speed.points) {
+                data.push_back(double(float(x * to_unit)));
+                data.push_back(double(float(y)));
+            }
+            json& ax = (*prof)[kAccelX];
+            ax["mode"] = "lut";
+            ax["Gain / Velocity"] = false;
+            ax["data"] = data;
+            r.written.speed = correction.speed;
+            // The fix was tested with Raw Accel's default speed measurement; say so when it differs.
+            const char* kSpeedArgs = "Input speed calculation parameters";
+            if (prof->contains(kSpeedArgs) && (*prof)[kSpeedArgs].is_object()) {
+                const json& sa = (*prof)[kSpeedArgs];
+                bool plain = true;
+                for (const auto& [key, val] : sa.items()) {
+                    if (val.is_boolean() && key.rfind("Whole", 0) == 0 && !val.get<bool>()) plain = false;
+                    if (val.is_number() && key == "lpNorm" && val.get<double>() != 2.0) plain = false;
+                    if (val.is_number() && key.rfind("Time in ms", 0) == 0 && val.get<double>() != 0.0) plain = false;
+                }
+                if (!plain)
+                    r.warnings.push_back("Raw Accel's input speed settings (by component, Lp norm or smoothing) differ "
+                                         "from the defaults the speed part of your fix was tested with.");
+            }
+            for (const char* w : {"Stretches domain for horizontal vs vertical inputs", "Stretches accel range for horizontal vs vertical inputs"})
+                if (prof->contains(w) && (*prof)[w].is_object() &&
+                    ((*prof)[w].value("x", 1.0) != 1.0 || (*prof)[w].value("y", 1.0) != 1.0))
+                    r.warnings.push_back("Raw Accel stretches speed differently for horizontal and vertical movement; the "
+                                         "speed part of your fix was tested without that.");
+        }
+    }
     r.json = j.dump(2);
     return r;
 }

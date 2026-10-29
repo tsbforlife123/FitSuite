@@ -77,3 +77,39 @@ TEST_CASE("non Raw Accel files are refused") {
     CHECK_FALSE(patch_rawaccel_settings(old.dump(), RawAccelProfile{}, "", &err));
     CHECK(err.find("Output DPI") != std::string::npos);
 }
+
+TEST_CASE("a speed curve is written as Raw Accel's lookup table in sensitivity mode") {
+    RawAccelProfile c;
+    c.speed.points = {{0.5, 0.96}, {2.0, 1.0}, {6.0, 1.04}, {12.0, 1.04}};
+    std::string err;
+    auto r = patch_rawaccel_settings(minimal_settings().dump(), c, "", &err);
+    REQUIRE_MESSAGE(r, err);
+    CHECK(r->warnings.empty());
+    const json p = json::parse(r->json)["profiles"][0];
+    const json& ax = p["Whole or horizontal accel parameters"];
+    CHECK(ax["mode"] == "lut");
+    CHECK(ax["Gain / Velocity"] == false);  // y is the sensitivity multiplier itself
+    REQUIRE(ax["data"].size() == 8);       // x0, y0, x1, y1, ...
+    CHECK(ax["data"][0].get<double>() == doctest::Approx(0.5));
+    CHECK(ax["data"][1].get<double>() == doctest::Approx(0.96));
+    CHECK(ax["data"][6].get<double>() == doctest::Approx(12.0));
+    CHECK(r->written.speed.points.size() == 4);
+
+    // With a DPI set for the device, Raw Accel's speed unit is inches per second: speeds are converted.
+    json s = minimal_settings();
+    s["defaultDeviceConfig"]["DPI (normalizes input speed unit: counts/ms -> in/s)"] = 800;
+    r = patch_rawaccel_settings(s.dump(), c, "", &err);
+    REQUIRE(r);
+    const json ax2 = json::parse(r->json)["profiles"][0]["Whole or horizontal accel parameters"];
+    CHECK(ax2["data"][0].get<double>() == doctest::Approx(0.5 * 1000.0 / 800.0));
+    CHECK(ax2["data"][1].get<double>() == doctest::Approx(0.96));
+
+    // A profile that already uses acceleration keeps it; the speed part is left out, with a warning.
+    r = patch_rawaccel_settings(minimal_settings(0, 1, 1000, "classic").dump(), c, "", &err);
+    REQUIRE(r);
+    CHECK(json::parse(r->json)["profiles"][0]["Whole or horizontal accel parameters"]["mode"] == "classic");
+    CHECK(r->written.speed.empty());
+    bool said = false;
+    for (const auto& w : r->warnings) said = said || w.find("speed part") != std::string::npos;
+    CHECK(said);
+}

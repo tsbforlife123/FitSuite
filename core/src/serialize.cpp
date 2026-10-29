@@ -212,6 +212,11 @@ json to_json(const Transform& t) {
         const auto& r = t.raw_accel;
         j["raw_accel"] = {{"rotation_deg", r.rotation_deg}, {"sens", r.sens}, {"yx_ratio", r.yx_ratio},
                           {"lr_ratio", r.lr_ratio},         {"ud_ratio", r.ud_ratio}};
+        if (!r.speed.empty()) {
+            json pts = json::array();
+            for (const auto& [x, y] : r.speed.points) pts.push_back({x, y});
+            j["raw_accel"]["speed_curve"] = pts;  // [input speed (counts/ms), sensitivity multiplier]
+        }
     }
     return j;
 }
@@ -236,6 +241,15 @@ bool transform_within_limits(const Transform& t, std::string* why) {
         for (double v : {r.yx_ratio, r.lr_ratio, r.ud_ratio})
             if (!(v >= lo && v <= hi)) return fail("a ratio exceeds the 15% safety limit");
         if (!(r.sens >= lo && r.sens <= hi)) return fail("sensitivity multiplier exceeds the 15% safety limit");
+        if (!r.speed.empty()) {
+            if (r.speed.points.size() > 257) return fail("speed curve has more than Raw Accel's 257 points");
+            double prev = 0.0;
+            for (const auto& [x, y] : r.speed.points) {
+                if (!(x > prev) || !std::isfinite(x)) return fail("speed curve's speeds are not increasing");
+                if (!(std::fabs(y - 1.0) <= kSpeedCurveMaxDeviation + 1e-6)) return fail("speed curve exceeds its 6% safety limit");
+                prev = x;
+            }
+        }
     }
     return true;
 }
@@ -283,6 +297,15 @@ std::optional<Transform> transform_from_json(const json& j, const std::string& p
             t.raw_accel.yx_ratio = a.num("yx_ratio", 1.0, 0.01, 100.0, true);
             t.raw_accel.lr_ratio = a.num("lr_ratio", 1.0, 0.01, 100.0, true);
             t.raw_accel.ud_ratio = a.num("ud_ratio", 1.0, 0.01, 100.0, true);
+            if (const json* sc = a.array_raw("speed_curve")) {  // optional: profiles from before 0.2.3 have none
+                for (const auto& p : *sc) {
+                    if (!p.is_array() || p.size() != 2 || !p[0].is_number() || !p[1].is_number()) {
+                        a.error("speed_curve", "expected [speed, multiplier] pairs");
+                        break;
+                    }
+                    t.raw_accel.speed.points.push_back({p[0].get<double>(), p[1].get<double>()});
+                }
+            }
         }
     }
     if (errors.size() != before) return std::nullopt;

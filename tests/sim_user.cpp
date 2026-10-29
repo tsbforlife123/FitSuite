@@ -80,7 +80,8 @@ Trial SimUser::run_trial(const TargetSpec& spec, const GameMapping& map, const T
     mv.t_us = std::max(mv.t_us, t_appear_us + int64_t(std::max(120.0, rng_.normal(p_.reaction_ms, p_.reaction_sd_ms)) * f * 1000.0));
 
     // Primary flick: planned for the baseline mapping, distorted by the motor map, plus noise.
-    const double g = p_.primary_gain * std::exp(rng_.normal(0.0, p_.radial_sd));
+    double g = p_.primary_gain * std::exp(rng_.normal(0.0, p_.radial_sd));
+    if (p_.dist_gain_slope != 0.0) g *= std::pow(std::max(spec.dist_deg, 0.5) / 12.0, p_.dist_gain_slope);
     const double a = rng_.normal(0.0, p_.angle_sd_deg) * kDegToRad;
     const Vec2 plan = rotate_screen_ccw((tr.target_counts - mv.out_pos) * g, a);
     Vec2 hand = mul(p_, plan);
