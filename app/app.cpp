@@ -816,7 +816,11 @@ void App::draw_status_bar() {
     field(fix, fix_color);
     field(rawaccel_installed() ? "Raw Accel: installed" : "Raw Accel: not installed", kTextMuted);
     if ((updater.step == Updater::Step::Available || updater.step == Updater::Step::Ready) && updater.release)
-        field(("Version " + updater.release->version_text() + " available (Settings)").c_str(), kAccent);
+        field(("Version " + updater.release->version_text() +
+               (updater.step == Updater::Step::Ready && setup_.app.auto_install_updates ? " installs when FitSuite next opens"
+                                                                                        : " available (Settings)"))
+                  .c_str(),
+              kAccent);
 
     // The newest message, if it has not expired.
     const double now = time();

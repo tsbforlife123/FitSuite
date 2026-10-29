@@ -197,6 +197,12 @@ struct AppSettings {
     bool update_check = true;
     std::string last_update_check_utc;
     std::string update_notified;         // version the player was last told about
+    // "Install updates by themselves": a new version is downloaded and checked in the background and
+    // installed the next time FitSuite opens (never while it runs, so never during a game or test).
+    bool auto_install_updates = false;
+    std::string pending_update_exe;      // downloaded and checked, waiting for the next start
+    std::string pending_update_sha;      // its SHA-256 (checked again before it is used)
+    std::string pending_update_version;  // "1.0.1"
     std::string notes_hidden;            // version whose "What's new" box the player chose not to show again
 };
 

@@ -350,6 +350,8 @@ bool Platform::apply_update(const fs::path& new_exe, std::string* error) {
         return false;
     }
     std::wstring cmd = L"\"" + cur.wstring() + L"\" --updated";
+    // Started with Windows (hidden in the notification area): the new version starts the same way.
+    if (wcsstr(GetCommandLineW(), L"--autostart")) cmd += L" --autostart";
     STARTUPINFOW si{sizeof si};
     PROCESS_INFORMATION pi{};
     const std::wstring dir = cur.parent_path().wstring();
