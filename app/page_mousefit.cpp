@@ -593,6 +593,12 @@ void tab_candidates(App& app) {
         ImGui::Text("angle bias:         Wald-F p = %.4f  (%s)", r.angle_test.p_value, r.angle_test.significant ? "kept" : "not significant");
         ImGui::Text("Raw Accel model:    Wald-F p = %.4f  (%s)", r.raw_accel_test.p_value,
                     r.raw_accel_test.significant ? "kept" : "not significant");
+        ImGui::Text("speed curve:        Wald-F p = %.4f  (%s), sensitivity ∝ speed^%+.3f%s", r.speed_test.p_value,
+                    r.speed_recommended ? "kept" : r.speed_test.significant ? "too small" : "not significant", r.speed_exponent,
+                    r.speed_bounds_scaled ? " (scaled to the 5% bound)" : "");
+        ImGui::Text("  flick levels %.2f–%.2f counts/ms: %+.1f%% / %+.1f%%; level bias %.1f%% → %.1f%% (in-sample)",
+                    r.speed_slow_cpms, r.speed_fast_cpms, r.speed_slow_pct, r.speed_fast_pct, r.speed_level_bias_before_pct,
+                    r.speed_level_bias_after_pct);
         ImGui::Text("bounds: ±%.0f%% sensitivity, ±%.1f° direction%s", Bounds{}.max_gain_deviation * 100, Bounds{}.max_angle_deg,
                     r.directional_bounds_scaled ? " — the fitted correction was scaled down to fit" : "");
         ui::pop_font();
@@ -1284,6 +1290,15 @@ void page_mousefit(App& app) {
             form_label("Rotation");
             const double rot = std::fabs(ra.rotation_deg) < 0.05 ? 0.0 : ra.rotation_deg;
             ImGui::TextColored(theme::v4(rot == 0.0 ? theme::kTextMuted : theme::kText), rot == 0.0 ? "none" : "%+.1f°", rot);
+            if (!ra.speed.empty() && ra.speed.points.size() >= 3) {
+                // make_speed_curve spans 0.1 × the slowest to 1.5 × the fastest measured flick speed.
+                const double v_slow = ra.speed.points.front().first / 0.1;
+                const double v_fast = ra.speed.points[ra.speed.points.size() - 2].first / 1.5;
+                const double slow = (speed_curve_flick_gain(ra.speed, v_slow) - 1.0) * 100.0;
+                const double fast = (speed_curve_flick_gain(ra.speed, v_fast) - 1.0) * 100.0;
+                form_label("With hand speed");
+                ImGui::Text("%+.1f%% near (slow) flicks, %+.1f%% far (fast) flicks", slow, fast);
+            }
             ImGui::EndTable();
         }
         ui::faint("Your average sensitivity stays the same, and no direction changes by more than 8%%.");

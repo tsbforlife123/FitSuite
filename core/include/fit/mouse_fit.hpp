@@ -29,6 +29,11 @@ struct FitOptions {
     double negligible_gain = 0.01;     // smaller corrections are not worth applying
     double negligible_angle_deg = 0.5;
     bool raw_accel_asymmetry = true;   // also fit L/R and U/D multipliers (separate up/down/left/right gains)
+    // Speed curve: sensitivity that changes a little with hand speed, when flicks to far targets
+    // (fast) land differently from flicks to near ones (slow). Raw Accel applies it as a lookup table.
+    bool speed_curve = true;
+    double speed_max_effect = 0.05;    // a flick at the fastest or slowest measured level changes by at most 5%
+    double negligible_speed = 0.02;    // fastest vs slowest level must differ by at least 2% to be worth it
     SegmentParams segment{};
 };
 
@@ -61,6 +66,18 @@ struct FitResult {
     double raw_accel_gain_mismatch = 0.0;      // max |g_RA - g_dir| over directions
     double raw_accel_angle_mismatch_deg = 0.0; // max |δ_RA - δ_dir| over directions
 
+    // Speed curve (part of the Raw Accel candidate: raw_accel.speed). Fitted from the flick rounds:
+    // log(distance ratio) against log(typical peak hand speed of the flick's distance level).
+    ComponentTest speed_test;
+    bool speed_recommended = false;
+    bool speed_bounds_scaled = false;
+    double speed_exponent = 0.0;          // sensitivity ∝ speed^k between the measured levels
+    double speed_slow_pct = 0.0;          // effect on a flick at the slowest level (+ = more sensitivity)
+    double speed_fast_pct = 0.0;          // ...and at the fastest level
+    double speed_slow_cpms = 0.0, speed_fast_cpms = 0.0;  // their typical peak speeds, counts per ms
+    // In-sample: largest difference between a distance level's average and the average of all levels.
+    double speed_level_bias_before_pct = 0.0, speed_level_bias_after_pct = 0.0;
+
     // In-sample check on the calibration flicks (not a validated result): largest per-direction
     // bias relative to the player's own average, before and after each correction.
     double max_radial_bias_before_pct = 0.0;
@@ -76,5 +93,14 @@ struct FitResult {
 
 // Rejects anything that is not a calibration session; only scored baseline trials are used.
 FitResult fit_profiles(const Session& calibration, const FitOptions& opt = {});
+
+// The Raw Accel lookup table for sensitivity ∝ speed^k, normalised so a flick whose peak speed is
+// v_mid keeps its distance (each flick sweeps through all speeds up to its peak, so the table is
+// scaled by the average over a minimum-jerk speed profile). Points span from well below v_slow to
+// above v_fast; outside them the sensitivity stays flat. Every value within ±kSpeedCurveMaxDeviation.
+SpeedCurve make_speed_curve(double k, double v_mid, double v_slow, double v_fast);
+// What a speed curve does to a whole minimum-jerk flick with this peak speed (counts per ms): its
+// distance multiplier (1 = unchanged).
+double speed_curve_flick_gain(const SpeedCurve& c, double peak_cpms);
 
 }  // namespace fit

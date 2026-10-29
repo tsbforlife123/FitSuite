@@ -97,7 +97,39 @@ bool enforce_bounds(DirectionalProfile& p, Bounds b) {
 
 // ---- Raw Accel ---------------------------------------------------------------------------
 
-Vec2 RawAccelProfile::apply(Vec2 in) const {
+double SpeedCurve::scale(double x) const {
+    // Raw Accel 1.7, common/accel-lookup.hpp (velocity = false), at float precision like its data.
+    const int size = int(points.size());
+    if (size < 2) return 1.0;
+    auto px = [&](int i) { return double(float(points[size_t(i)].first)); };
+    auto py = [&](int i) { return double(float(points[size_t(i)].second)); };
+    if (x <= 0) return 0.0;
+    int lo = 0, hi = size - 2;
+    while (lo <= hi) {
+        const int mid = (lo + hi) / 2;
+        if (x < px(mid)) hi = mid - 1;
+        else if (x > px(mid)) lo = mid + 1;
+        else return py(mid);
+    }
+    if (lo > 0) {
+        const double a = py(lo - 1), b = py(lo);
+        const double t = (x - px(lo - 1)) / (px(lo) - px(lo - 1));
+        const double v = a + t * (b - a);  // Raw Accel's lerp(): extends the segment beyond its end
+        if ((t > 1) == (a < b)) return std::max(v, b);
+        return std::min(v, b);
+    }
+    return py(0);
+}
+
+double SpeedCurve::max_deviation() const {
+    double m = 0.0;
+    for (const auto& p : points) m = std::max(m, std::fabs(double(float(p.second)) - 1.0));
+    return m;
+}
+
+Vec2 RawAccelProfile::apply(Vec2 in) const { return apply(in, -1.0); }
+
+Vec2 RawAccelProfile::apply(Vec2 in, double time_ms) const {
     Vec2 v = in;
     if (rotation_deg != 0.0) {
         // rawaccel: direction(deg) = (cos, sin); rotate(v, dir) = (x·c − y·s, x·s + y·c)
@@ -105,6 +137,8 @@ Vec2 RawAccelProfile::apply(Vec2 in) const {
         const double c = std::cos(r), s = std::sin(r);
         v = {v.x * c - v.y * s, v.x * s + v.y * c};
     }
+    // Speed curve ("whole" mode, Euclidean speed, no smoothing, range weight 1): scale = lut(speed).
+    if (time_ms > 0.0 && !speed.empty()) v = v * speed.scale(length(v) / time_ms);
     v.x *= sens;
     v.y *= sens * yx_ratio;
     if (lr_ratio != 1.0 && v.x < 0) v.x *= lr_ratio;
@@ -127,7 +161,7 @@ Vec2 RawAccelProfile::inverse_apply(Vec2 out) const {
 }
 
 bool RawAccelProfile::is_identity() const {
-    return rotation_deg == 0.0 && sens == 1.0 && yx_ratio == 1.0 && lr_ratio == 1.0 && ud_ratio == 1.0;
+    return rotation_deg == 0.0 && sens == 1.0 && yx_ratio == 1.0 && lr_ratio == 1.0 && ud_ratio == 1.0 && speed.empty();
 }
 
 double RawAccelProfile::gain(double theta) const { return length(apply(raw_unit_from_screen_angle(theta))); }
@@ -175,7 +209,16 @@ Vec2 Transformer::apply(Vec2 in, int64_t t_us) {
     if (in.x == 0.0 && in.y == 0.0) return {0.0, 0.0};
     switch (t_.kind) {
         case TransformKind::Identity: return in;
-        case TransformKind::RawAccel: return t_.raw_accel.apply(in);
+        case TransformKind::RawAccel: {
+            if (t_.raw_accel.speed.empty()) return t_.raw_accel.apply(in);
+            // Raw Accel's driver: time since the previous report, clamped (the first one counts as the
+            // longest time, as after the mouse has been still).
+            double time_ms = kRawAccelMaxTimeMs;
+            if (has_last_) time_ms = std::clamp(double(t_us - last_t_us_) / 1000.0, kRawAccelMinTimeMs, kRawAccelMaxTimeMs);
+            has_last_ = true;
+            last_t_us_ = t_us;
+            return t_.raw_accel.apply(in, time_ms);
+        }
         case TransformKind::Directional: break;
     }
     if (has_last_) {

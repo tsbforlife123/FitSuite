@@ -187,3 +187,41 @@ TEST_CASE("identity transformer passes input through untouched") {
     CHECK(o.x == 123.0);
     CHECK(o.y == -45.0);
 }
+
+TEST_CASE("the speed curve is evaluated exactly like Raw Accel's lookup table") {
+    SpeedCurve c;
+    c.points = {{1.0, 0.9}, {2.0, 1.0}, {4.0, 1.1}, {8.0, 1.1}};
+    CHECK(c.scale(0.5) == doctest::Approx(0.9));   // below the first point: its value
+    CHECK(c.scale(1.0) == doctest::Approx(0.9));
+    CHECK(c.scale(3.0) == doctest::Approx(1.05));  // linear in between
+    CHECK(c.scale(4.0) == doctest::Approx(1.1));
+    CHECK(c.scale(20.0) == doctest::Approx(1.1));  // beyond the last point: the last segment, flat here
+    CHECK(c.scale(0.0) == 0.0);                    // Raw Accel returns 0 for no movement
+    SpeedCurve rising;
+    rising.points = {{1.0, 1.0}, {2.0, 1.1}};
+    CHECK(rising.scale(3.0) == doctest::Approx(1.2));  // Raw Accel extends a rising last segment
+    CHECK(c.max_deviation() == doctest::Approx(0.1));
+}
+
+TEST_CASE("Raw Accel profiles apply the speed curve per report, from the time since the last one") {
+    RawAccelProfile p;
+    p.speed.points = {{1.0, 0.95}, {4.0, 1.05}, {8.0, 1.05}};
+    p.yx_ratio = 1.02;
+    // apply(in) is the direction part only; apply(in, time) the whole pipeline.
+    CHECK(p.apply(Vec2{3, 0}).x == doctest::Approx(3.0));
+    const Vec2 o = p.apply(Vec2{3, 0}, 1.0);  // 3 counts/ms: between 0.95 and 1.05
+    CHECK(o.x == doctest::Approx(3.0 * (0.95 + 0.1 * 2.0 / 3.0)));
+    CHECK(p.apply(Vec2{0, 3}, 1.0).y == doctest::Approx(3.0 * 1.02 * (0.95 + 0.1 * 2.0 / 3.0)));
+    CHECK_FALSE(p.is_identity());
+
+    Transform t;
+    t.kind = TransformKind::RawAccel;
+    t.raw_accel = p;
+    Transformer tf(t);
+    // First report: no previous one, so the longest time (slow) → the first point's value.
+    CHECK(tf.apply(Vec2{4, 0}, 1'000'000).x == doctest::Approx(4.0 * 0.95));
+    // 1 ms later: 4 counts per ms → 1.05.
+    CHECK(tf.apply(Vec2{4, 0}, 1'001'000).x == doctest::Approx(4.0 * 1.05));
+    // 2 ms later: 2 counts per ms → between.
+    CHECK(tf.apply(Vec2{4, 0}, 1'003'000).x == doctest::Approx(4.0 * (0.95 + 0.1 / 3.0)));
+}

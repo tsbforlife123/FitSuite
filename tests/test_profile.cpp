@@ -336,3 +336,32 @@ TEST_CASE("UTC timestamps") {
     CHECK(t == 1792959845);
     CHECK_FALSE(parse_utc_iso("yesterday", t));
 }
+
+TEST_CASE("a fix with a speed curve round-trips, and an out-of-limit curve is refused") {
+    Transform t;
+    t.kind = TransformKind::RawAccel;
+    t.raw_accel.yx_ratio = 1.04;
+    t.raw_accel.speed.points = {{0.2, 0.95}, {2.0, 1.0}, {9.0, 1.05}, {18.0, 1.05}};
+    std::vector<std::string> errs;
+    auto back = transform_from_json(to_json(t), "transform", errs);
+    REQUIRE_MESSAGE(back, (errs.empty() ? std::string() : errs.front()));
+    REQUIRE(back->raw_accel.speed.points.size() == 4);
+    CHECK(back->raw_accel.speed.points[2].first == doctest::Approx(9.0));
+    CHECK(back->raw_accel.speed.points[2].second == doctest::Approx(1.05));
+
+    // Profiles from before speed curves load without one.
+    json old = to_json(t);
+    old["raw_accel"].erase("speed_curve");
+    back = transform_from_json(old, "transform", errs);
+    REQUIRE(back);
+    CHECK(back->raw_accel.speed.empty());
+
+    Transform bad = t;
+    bad.raw_accel.speed.points[2].second = 1.20;  // beyond the 6% limit
+    std::string why;
+    CHECK_FALSE(transform_within_limits(bad, &why));
+    CHECK(why.find("6%") != std::string::npos);
+    bad = t;
+    bad.raw_accel.speed.points[2].first = 1.0;  // speeds not increasing
+    CHECK_FALSE(transform_within_limits(bad, &why));
+}

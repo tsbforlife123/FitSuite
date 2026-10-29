@@ -18,7 +18,10 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "fit/common.hpp"
 
@@ -61,14 +64,37 @@ struct DirectionalProfile {
 // function smooth; pointwise clipping would create kinks. Returns true if anything was scaled.
 bool enforce_bounds(DirectionalProfile& p, Bounds b);
 
+// A sensitivity multiplier that depends on how fast the hand moves: Raw Accel 1.7's "lookup table"
+// acceleration (mode "lut") with "Gain / Velocity" off, so each point's y is the multiplier itself.
+// x is the input speed in counts per millisecond (Raw Accel's unit when no DPI is set for the
+// device). The evaluation transcribes common/accel-lookup.hpp, including that Raw Accel keeps the
+// first value below the slowest point and extends the last segment beyond the fastest one (so the
+// curves FitSuite writes end with two equal values).
+struct SpeedCurve {
+    std::vector<std::pair<double, double>> points;  // increasing x; stored at float precision, like Raw Accel
+    bool empty() const { return points.size() < 2; }
+    double scale(double speed_counts_per_ms) const;
+    double max_deviation() const;  // largest |y − 1|
+};
+// A speed curve stays within ±6% everywhere, so with the ±8% directional bound the whole fix
+// stays inside the 15% hard limit.
+inline constexpr double kSpeedCurveMaxDeviation = 0.06;
+// Raw Accel's driver measures the time since the previous report, clamped to this range (ms).
+inline constexpr double kRawAccelMinTimeMs = 1000.0 / 8000.0 / 2.0, kRawAccelMaxTimeMs = 100.0;
+
 struct RawAccelProfile {
     double rotation_deg = 0.0;  // "Degrees of rotation"
     double sens = 1.0;          // "Output DPI" / 1000 (no DPI normalization)
     double yx_ratio = 1.0;      // "Y/X output DPI ratio (vertical sens multiplier)"
     double lr_ratio = 1.0;      // "L/R output DPI ratio (left sens multiplier)"
     double ud_ratio = 1.0;      // "U/D output DPI ratio (up sens multiplier)"
+    SpeedCurve speed;           // empty: no acceleration ("noaccel")
 
+    // Direction part only (rotation, sensitivity, ratios): the speed curve is not applied.
     Vec2 apply(Vec2 in) const;
+    // The whole pipeline for one report that arrived `time_ms` after the previous one: rotation →
+    // speed curve (speed = |rotated input| / time) → sensitivity and ratios, as Raw Accel's modify().
+    Vec2 apply(Vec2 in, double time_ms) const;
     // Exact inverse of apply() (the sign tests are unaffected by the positive scalings).
     Vec2 inverse_apply(Vec2 out) const;
     bool is_identity() const;

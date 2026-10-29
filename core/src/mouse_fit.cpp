@@ -178,6 +178,51 @@ void direction_biases(const std::vector<Obs>& obs, int n_levels, const std::func
 
 }  // namespace
 
+namespace {
+// Minimum-jerk speed profile, normalised to a peak of 1: v(τ) = 30τ²(1−τ)² / 1.875.
+double min_jerk_speed(double tau) { return 30.0 * tau * tau * (1.0 - tau) * (1.0 - tau) / 1.875; }
+}  // namespace
+
+double speed_curve_flick_gain(const SpeedCurve& c, double peak) {
+    if (c.empty() || !(peak > 0.0)) return 1.0;
+    double num = 0.0, den = 0.0;
+    for (int i = 1; i < 400; ++i) {
+        const double v = min_jerk_speed(i / 400.0) * peak;
+        num += v * c.scale(v);
+        den += v;
+    }
+    return den > 0.0 ? num / den : 1.0;
+}
+
+SpeedCurve make_speed_curve(double k, double v_mid, double v_slow, double v_fast) {
+    SpeedCurve c;
+    if (!(v_mid > 0.0) || !(v_slow > 0.0) || !(v_fast > v_slow) || k == 0.0) return c;
+    const double cap = kSpeedCurveMaxDeviation;
+    auto build = [&](double v_ref) {
+        SpeedCurve out;
+        const double x0 = v_slow * 0.1, x1 = v_fast * 1.5;
+        const int n = 24;
+        for (int i = 0; i < n; ++i) {
+            const double x = x0 * std::pow(x1 / x0, double(i) / double(n - 1));
+            const double y = std::clamp(std::pow(x / v_ref, k), 1.0 - cap, 1.0 + cap);
+            out.points.push_back({double(float(x)), double(float(y))});
+        }
+        // Raw Accel extends the last segment beyond the last point: end flat.
+        out.points.push_back({double(float(x1 * 2.0)), out.points.back().second});
+        return out;
+    };
+    // Choose the reference speed so a flick peaking at v_mid keeps its distance (a few bisection
+    // steps on log v_ref; the flick gain falls as v_ref rises when k > 0, and rises when k < 0).
+    double lo = std::log(v_mid) - 3.0, hi = std::log(v_mid) + 3.0;
+    for (int it = 0; it < 60; ++it) {
+        const double mid = 0.5 * (lo + hi);
+        const double g = speed_curve_flick_gain(build(std::exp(mid)), v_mid);
+        if ((g > 1.0) == (k > 0.0)) lo = mid; else hi = mid;
+    }
+    c = build(std::exp(0.5 * (lo + hi)));
+    return c;
+}
+
 FitResult fit_profiles(const Session& s, const FitOptions& opt) {
     FitResult r;
     if (s.kind != SessionKind::Calibration) {
@@ -480,6 +525,83 @@ FitResult fit_profiles(const Session& s, const FitOptions& opt) {
             std::max(r.raw_accel_angle_mismatch_deg, std::fabs(ra.angle(th) - r.directional.angle(th)) * kRadToDeg);
     }
 
+    // ---- speed curve ----------------------------------------------------------------------------
+    // Players often land long on near targets and short on far ones. Near targets get slow flicks
+    // and far ones fast flicks, so a sensitivity that rises (or falls) a little with hand speed
+    // evens that out; Raw Accel can apply it as a lookup table. The predictor is the typical peak
+    // speed of the flick's distance level, never the flick's own speed: a flick that overshoots is
+    // also faster, so its own speed would show a link that is only its error.
+    if (opt.speed_curve) {
+        std::map<int, std::vector<double>> peaks;  // flick level -> peak hand speeds (counts/ms)
+        for (const auto& o : obs)
+            if (o.m->spec.task == Task::Flick) peaks[o.dist_level].push_back(o.m->peak_speed_deg_s / map.deg_per_count() / 1000.0);
+        std::map<int, double> lv;  // log typical peak speed per level
+        for (auto& [l, v] : peaks)
+            if (v.size() >= 5) lv[l] = std::log(median(v));
+        if (lv.size() >= 3) {
+            double mean_lv = 0.0, lmin = 1e9, lmax = -1e9;
+            for (const auto& [l, v] : lv) {
+                mean_lv += v;
+                lmin = std::min(lmin, v);
+                lmax = std::max(lmax, v);
+            }
+            mean_lv /= double(lv.size());
+            std::vector<const Obs*> fo;
+            for (const auto& o : obs)
+                if (o.m->spec.task == Task::Flick && lv.count(o.dist_level)) fo.push_back(&o);
+            Matrix Xs(fo.size(), 6);
+            std::vector<double> ys(fo.size());
+            for (size_t i = 0; i < fo.size(); ++i) {
+                const double th = fo[i]->theta;
+                Xs(i, 0) = 1.0;
+                Xs(i, 1) = lv[fo[i]->dist_level] - mean_lv;
+                Xs(i, 2) = std::cos(th);
+                Xs(i, 3) = std::sin(th);
+                Xs(i, 4) = std::cos(2 * th);
+                Xs(i, 5) = std::sin(2 * th);
+                ys[i] = std::log(fo[i]->m->radial_ratio);
+            }
+            const Regression Rs = robust_fit(Xs, ys, std::vector<bool>(6, false), 1.0);
+            if (Rs.ok && lmax - lmin > 0.05) {
+                r.speed_test = wald(Rs, {1}, opt.alpha, fo.size(), 6);
+                double k = -Rs.beta_ols[1];  // landing ∝ speed^β, so sensitivity ∝ speed^−β evens it out
+                const double span = std::max(lmax - mean_lv, mean_lv - lmin);
+                const double kmax = std::log(1.0 + opt.speed_max_effect) / std::max(span, 1e-6);
+                if (std::fabs(k) > kmax) {
+                    k = std::copysign(kmax, k);
+                    r.speed_bounds_scaled = true;
+                }
+                r.speed_exponent = k;
+                r.speed_slow_cpms = std::exp(lmin);
+                r.speed_fast_cpms = std::exp(lmax);
+                r.speed_slow_pct = (std::exp(k * (lmin - mean_lv)) - 1.0) * 100.0;
+                r.speed_fast_pct = (std::exp(k * (lmax - mean_lv)) - 1.0) * 100.0;
+                // In-sample: each level's average landing relative to the average level, before and after.
+                std::map<int, std::pair<double, int>> sum;
+                for (size_t i = 0; i < fo.size(); ++i) {
+                    auto& s = sum[fo[i]->dist_level];
+                    s.first += ys[i];
+                    s.second += 1;
+                }
+                double gm = 0.0;
+                for (const auto& [l, s] : sum) gm += s.first / s.second;
+                gm /= double(sum.size());
+                for (const auto& [l, s] : sum) {
+                    const double before = s.first / s.second - gm;
+                    const double after = before + k * (lv[l] - mean_lv);
+                    r.speed_level_bias_before_pct = std::max(r.speed_level_bias_before_pct, std::fabs(std::exp(before) - 1.0) * 100.0);
+                    r.speed_level_bias_after_pct = std::max(r.speed_level_bias_after_pct, std::fabs(std::exp(after) - 1.0) * 100.0);
+                }
+                const double change = std::exp(std::fabs(k) * (lmax - lmin)) - 1.0;
+                if (r.speed_test.significant && change >= opt.negligible_speed && std::fabs(k) > 1e-6) {
+                    r.raw_accel.speed = make_speed_curve(k, std::exp(mean_lv), std::exp(lmin), std::exp(lmax));
+                    r.speed_recommended = true;
+                    r.raw_accel_recommended = true;
+                }
+            }
+        }
+    }
+
     // ---- in-sample effect (no adaptation assumed) -----------------------------------------------
     direction_biases(obs, n_levels, [](const Obs& o) { return o.e; }, r.max_radial_bias_before_pct,
                      r.max_angle_bias_before_deg);
@@ -494,9 +616,13 @@ FitResult fit_profiles(const Session& s, const FitOptions& opt) {
         os << "No correction recommended: your direction-to-direction differences are within measurement noise "
               "or too small to matter. Keep your current setup.";
     } else {
-        os << "Directional bias found (largest " << std::lround(r.max_radial_bias_before_pct * 10) / 10.0
-           << "% distance, " << std::lround(r.max_angle_bias_before_deg * 10) / 10.0
-           << "° angle). A candidate correction is ready; it is not recommended until a blinded validation confirms it.";
+        if (r.directional_recommended || r.raw_accel_test.significant)
+            os << "Directional bias found (largest " << std::lround(r.max_radial_bias_before_pct * 10) / 10.0
+               << "% distance, " << std::lround(r.max_angle_bias_before_deg * 10) / 10.0 << "° angle). ";
+        if (r.speed_recommended)
+            os << "Your near and far flicks land differently (up to " << std::lround(r.speed_level_bias_before_pct * 10) / 10.0
+               << "%), so the fix also changes sensitivity slightly with hand speed. ";
+        os << "A candidate correction is ready; it is not recommended until a blinded validation confirms it.";
     }
     r.message = os.str();
     return r;

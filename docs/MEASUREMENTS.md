@@ -133,6 +133,32 @@ A correction maps each input vector to `out = g(θ) · R(δ(θ)) · in`, where �
   (assuming your hand would move the same way). Only the blinded comparison shows whether a correction
   helps.
 
+### Speed curve (sensitivity that changes with hand speed)
+
+Many players land long on near targets and short on far ones. Near targets get slow flicks and far ones fast
+flicks, so a sensitivity that changes a little with hand speed evens that out, live, on every mouse report,
+based only on how fast your hand moves (never on anything in a game). Raw Accel applies it as its "lookup
+table" acceleration (mode `lut`, Gain / Velocity off).
+
+* **Fit:** flick rounds only. Robust regression of `log(radial ratio)` on the log of each distance level's
+  typical (median) peak hand speed, plus the direction terms. The predictor is the level's speed, never the
+  flick's own: a flick that overshoots is also a faster flick, so its own speed would show a link that is only
+  its error. Distance levels are set by the targets, not by the player.
+* **Curve:** sensitivity ∝ speed^k with k = −slope, normalised so a flick at the typical speed of the middle
+  levels keeps its distance (a flick sweeps through every speed up to its peak, so this uses the average over a
+  minimum-jerk speed profile). Bounded so a flick at the slowest or fastest measured level changes by at most
+  5%, every table value within ±6%, flat below 0.1× the slowest and above 1.5× the fastest level.
+* **Kept** only if the slope is significant (Wald F, α = 0.01) and the fastest and slowest levels differ by at
+  least 2%. It is part of the Raw Accel candidate, so the blind test checks it together with the direction part.
+* **In-app** FitSuite evaluates the table exactly as Raw Accel's `accel-lookup.hpp` does (float precision, the
+  first value below the first point, the last segment extended beyond the last point, which is why the table
+  ends with two equal values), with the speed computed per report as Raw Accel's driver does: counts ÷ time
+  since the previous report, clamped to 0.0625–100 ms.
+* **Export:** written into "Whole or horizontal accel parameters". With a DPI set for the device in Raw Accel
+  (its speed unit then becomes inches per second) the speeds are converted. If the profile already uses another
+  acceleration, the speed part is left out with a warning; warnings also name non-default speed settings
+  (by-component, Lp norm, smoothing, domain or range stretching).
+
 These procedures are checked by simulation in the unit tests (simulated players, not people):
 
 | Situation | Result |

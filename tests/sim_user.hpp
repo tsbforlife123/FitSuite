@@ -20,6 +20,9 @@ struct SimUserParams {
     // bottom of the screen land 12% short while upward flicks are fine. Not representable by M.
     double right_gain = 1.0, left_gain = 1.0, up_gain = 1.0, down_gain = 1.0;
     double primary_gain = 0.93;   // typical undershoot of the first flick
+    // Distance-dependent landing: the first flick is scaled by (distance / 12°)^slope, so a negative
+    // slope makes far targets land shorter and near ones longer (the "range effect").
+    double dist_gain_slope = 0.0;
     double radial_sd = 0.07;      // multiplicative noise of the first flick
     double angle_sd_deg = 2.0;
     double reaction_ms = 230.0, reaction_sd_ms = 35.0;

@@ -141,3 +141,45 @@ TEST_CASE("a downward-only undershoot gets a downward-only correction") {
     // The smooth profile sees it too.
     CHECK(r.directional.gain(-90 * kDegToRad) / r.directional.gain(90 * kDegToRad) > 1.04);
 }
+
+TEST_CASE("the speed curve: built so a typical flick keeps its distance, within its bounds") {
+    const SpeedCurve c = make_speed_curve(0.08, 3.0, 1.5, 6.0);
+    REQUIRE(c.points.size() >= 10);
+    for (size_t i = 1; i < c.points.size(); ++i) CHECK(c.points[i].first > c.points[i - 1].first);
+    CHECK(c.max_deviation() <= kSpeedCurveMaxDeviation + 1e-6);
+    CHECK(c.points.back().second == c.points[c.points.size() - 2].second);  // flat end: Raw Accel extends the last segment
+    CHECK(speed_curve_flick_gain(c, 3.0) == doctest::Approx(1.0).epsilon(0.003));
+    CHECK(speed_curve_flick_gain(c, 6.0) > 1.03);   // fast flicks: more sensitivity
+    CHECK(speed_curve_flick_gain(c, 1.5) < 0.97);   // slow flicks: less
+    const SpeedCurve d = make_speed_curve(-0.08, 3.0, 1.5, 6.0);
+    CHECK(speed_curve_flick_gain(d, 6.0) < 0.97);
+}
+
+TEST_CASE("far targets landing short gets a speed curve; an even player does not") {
+    sim::SimUserParams p;
+    p.dist_gain_slope = -0.10;  // 26° flicks land about 8% shorter than 12° ones, 6° about 7% longer
+    int found = 0;
+    for (uint64_t i = 0; i < 8; ++i) {
+        const FitResult r = fit_profiles(simulate_calibration(p, 500 + i, 6));
+        REQUIRE(r.ok);
+        if (i == 0)
+            MESSAGE("speed curve: p = " << r.speed_test.p_value << ", k = " << r.speed_exponent << ", slow "
+                                        << r.speed_slow_pct << "%, fast " << r.speed_fast_pct << "%, level bias "
+                                        << r.speed_level_bias_before_pct << "% -> " << r.speed_level_bias_after_pct << "%");
+        if (r.speed_recommended && r.raw_accel_recommended && r.speed_exponent > 0.0 &&
+            speed_curve_flick_gain(r.raw_accel.speed, r.speed_fast_cpms) > 1.0 &&
+            r.speed_level_bias_after_pct < r.speed_level_bias_before_pct)
+            ++found;
+    }
+    MESSAGE("distance-dependent landing found in " << found << " of 8 calibrations");
+    CHECK(found >= 7);
+
+    int invented = 0;
+    for (uint64_t i = 0; i < 60; ++i) {
+        const FitResult r = fit_profiles(simulate_calibration({}, 2000 + i, 4));
+        REQUIRE(r.ok);
+        if (r.speed_recommended) ++invented;
+    }
+    MESSAGE("even player: speed curve proposed in " << invented << " of 60 calibrations");
+    CHECK(invented <= 4);
+}
