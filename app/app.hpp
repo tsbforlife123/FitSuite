@@ -328,6 +328,7 @@ private:
     void tick_updater();
     void draw_update_prompt();
     void draw_whats_new();  // this version's notes, once after an update
+    bool whats_new_open_ = false;  // reopened with "What's new" in the status bar
     bool checked_this_launch_ = false;  // updates are checked once each time FitSuite opens
     double rawaccel_folder_checked_at_ = -100.0;
     std::filesystem::path rawaccel_folder_cache_;  // shutdown() ran (on exit, or when Windows ends the session)

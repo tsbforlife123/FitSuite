@@ -290,7 +290,7 @@ void App::tick_updater() {
 void App::draw_update_prompt() {
     auto& u = updater;
     if (!setup_.app.setup_done || u.prompt_dismissed || !u.release || mouse.test || motion.test) return;
-    if (setup_.app.notes_seen != kAppVersion && *kReleaseNotes) return;  // "What's new" first
+    if ((setup_.app.notes_seen != kAppVersion && *kReleaseNotes) || whats_new_open_) return;  // "What's new" first
     const bool working = u.install_when_ready;  // the player clicked Update
     if (!working && u.step != Updater::Step::Available) return;
     if (working && u.step == Updater::Step::Ready) {
@@ -348,11 +348,13 @@ static std::string plain_notes(const char* md) {
     return out;
 }
 
-// "What's new in FitSuite x.y.z", shown once, the first time a new version opens after an update.
-// New players never see it (finishing the setup counts as seen).
+// "What's new in FitSuite x.y.z", shown once, the first time a new version opens after an update,
+// and again whenever the player clicks "What's new" in the status bar. New players do not get it by
+// themselves (finishing the setup counts as seen).
 void App::draw_whats_new() {
-    if (!setup_.app.setup_done || setup_.app.notes_seen == kAppVersion || !*kReleaseNotes) return;
-    if (mouse.test || motion.test) return;
+    if (!*kReleaseNotes || mouse.test || motion.test) return;
+    const bool after_update = setup_.app.setup_done && setup_.app.notes_seen != kAppVersion;
+    if (!after_update && !whats_new_open_) return;
     const ImGuiViewport* vp = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(ImVec2(vp->Pos.x + vp->Size.x * 0.5f, vp->Pos.y + vp->Size.y * 0.5f), ImGuiCond_Always,
                             ImVec2(0.5f, 0.5f));
@@ -364,8 +366,11 @@ void App::draw_whats_new() {
     ui::wrapped(plain_notes(kReleaseNotes).c_str());
     ImGui::Spacing();
     if (ui::button_primary("Got it")) {
-        setup_.app.notes_seen = kAppVersion;
-        save_now();
+        whats_new_open_ = false;
+        if (after_update) {
+            setup_.app.notes_seen = kAppVersion;
+            save_now();
+        }
     }
     ImGui::End();
 }
