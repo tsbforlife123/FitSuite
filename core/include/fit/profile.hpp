@@ -195,6 +195,7 @@ struct AppSettings {
     bool update_check = true;
     std::string last_update_check_utc;
     std::string update_notified;         // version the player was last told about
+    std::string notes_seen;              // version whose "What's new" notes the player has seen
 };
 
 struct SetupProfile {

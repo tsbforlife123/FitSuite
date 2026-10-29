@@ -992,6 +992,7 @@ void App::frame() {
     ImGui::End();
     ImGui::PopStyleVar(4);
     tick_pending_display(*this);
+    draw_whats_new();
     draw_update_prompt();
 }
 

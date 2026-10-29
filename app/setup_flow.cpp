@@ -290,6 +290,7 @@ void App::tick_updater() {
 void App::draw_update_prompt() {
     auto& u = updater;
     if (!setup_.app.setup_done || u.prompt_dismissed || !u.release || mouse.test || motion.test) return;
+    if (setup_.app.notes_seen != kAppVersion && *kReleaseNotes) return;  // "What's new" first
     const bool working = u.install_when_ready;  // the player clicked Update
     if (!working && u.step != Updater::Step::Available) return;
     if (working && u.step == Updater::Step::Ready) {
@@ -336,7 +337,41 @@ void App::draw_update_prompt() {
     ImGui::End();
 }
 
+// The release notes as plain text: Markdown's **bold** and `code` marks are left out.
+static std::string plain_notes(const char* md) {
+    std::string out;
+    for (const char* p = md; *p; ++p) {
+        if (*p == '`') continue;
+        if (p[0] == '*' && p[1] == '*') { ++p; continue; }
+        out += *p;
+    }
+    return out;
+}
+
+// "What's new in FitSuite x.y.z", shown once, the first time a new version opens after an update.
+// New players never see it (finishing the setup counts as seen).
+void App::draw_whats_new() {
+    if (!setup_.app.setup_done || setup_.app.notes_seen == kAppVersion || !*kReleaseNotes) return;
+    if (mouse.test || motion.test) return;
+    const ImGuiViewport* vp = ImGui::GetMainViewport();
+    ImGui::SetNextWindowPos(ImVec2(vp->Pos.x + vp->Size.x * 0.5f, vp->Pos.y + vp->Size.y * 0.5f), ImGuiCond_Always,
+                            ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(520, 0));
+    const std::string title = std::string("What's new in FitSuite ") + kAppVersion;
+    ImGui::Begin(title.c_str(), nullptr,
+                 ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings |
+                     ImGuiWindowFlags_NoMove);
+    ui::wrapped(plain_notes(kReleaseNotes).c_str());
+    ImGui::Spacing();
+    if (ui::button_primary("Got it")) {
+        setup_.app.notes_seen = kAppVersion;
+        save_now();
+    }
+    ImGui::End();
+}
+
 void App::finish_setup() {
+    setup_.app.notes_seen = kAppVersion;  // a new player has nothing to catch up on
     setup_.app.setup_done = true;
     setup_.app.setup_step = 0;
     save_now();
