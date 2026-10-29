@@ -784,7 +784,11 @@ void App::draw_status_bar() {
     const std::string right_text = platform_.dev_harness() ? std::string("DEVELOPMENT HARNESS · simulated input")
                                                             : std::string("Preview ") + kAppVersion + " · local only";
     const char* right = right_text.c_str();
-    const float right_w = ImGui::CalcTextSize(right).x;
+    // "What's new" sits just left of the version, and reopens this version's notes.
+    const char* notes_link = "What's new";
+    const bool has_notes = *kReleaseNotes != '\0';
+    const float link_w = has_notes ? ImGui::CalcTextSize(notes_link).x + 21.0f : 0.0f;  // + divider
+    const float right_w = ImGui::CalcTextSize(right).x + link_w;
     if (!toasts_.empty()) {
         const Toast& t = toasts_.back();
         unsigned c = kText;
@@ -805,6 +809,10 @@ void App::draw_status_bar() {
         }
     }
     ImGui::SetCursorScreenPos(ImVec2(p.x + w - right_w - 10, p.y + 5));
+    if (has_notes) {
+        if (ui::button_link(notes_link)) whats_new_open_ = true;
+        separator();
+    }
     ImGui::PushStyleColor(ImGuiCol_Text, v4(platform_.dev_harness() ? kBad : kTextFaint));
     ImGui::TextUnformatted(right);
     ImGui::PopStyleColor();
