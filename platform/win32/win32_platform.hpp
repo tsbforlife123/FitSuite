@@ -143,6 +143,7 @@ public:
     uint64_t start_elevated(const std::filesystem::path& exe, std::string* error) override;
     std::vector<std::filesystem::path> find_rawaccel_folders() override;
     bool vc_runtime_installed() override;
+    fit::WindowsGameSettings windows_game_settings() override;
     std::filesystem::path programs_dir() override;
     std::filesystem::path self_exe() override;
     bool apply_update(const std::filesystem::path& new_exe, std::string* error) override;

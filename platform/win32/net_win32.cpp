@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdio>
+#include <cwctype>
 #include <fstream>
 
 #include "fit/profile.hpp"
@@ -266,6 +267,41 @@ std::vector<fs::path> Platform::find_rawaccel_folders() {
         ec.clear();
     }
     return out;
+}
+
+fit::WindowsGameSettings Platform::windows_game_settings() {
+    fit::WindowsGameSettings w;
+    DWORD v = 0, size = sizeof v;
+    // Game Mode: on unless switched off (Windows writes the value only once it was changed).
+    if (RegGetValueW(HKEY_CURRENT_USER, L"Software\\Microsoft\\GameBar", L"AutoGameModeEnabled", RRF_RT_REG_DWORD, nullptr, &v,
+                     &size) == ERROR_SUCCESS)
+        w.game_mode = v != 0;
+    else
+        w.game_mode = true;
+    // Hardware-accelerated GPU scheduling: 2 on, 1 off, missing when Windows decides.
+    v = 0;
+    size = sizeof v;
+    if (RegGetValueW(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\GraphicsDrivers", L"HwSchMode", RRF_RT_REG_DWORD,
+                     nullptr, &v, &size) == ERROR_SUCCESS &&
+        (v == 1 || v == 2))
+        w.hags = v == 2;
+    // The active power plan, by the GUIDs Windows uses for its own plans.
+    wchar_t guid[64] = {};
+    DWORD gsize = sizeof guid;
+    if (RegGetValueW(HKEY_LOCAL_MACHINE, L"SYSTEM\\CurrentControlSet\\Control\\Power\\User\\PowerSchemes", L"ActivePowerScheme",
+                     RRF_RT_REG_SZ, nullptr, guid, &gsize) == ERROR_SUCCESS) {
+        std::wstring g = guid;
+        for (auto& ch : g) ch = wchar_t(towlower(ch));
+        if (g == L"381b4222-f694-41f0-9685-ff5bb260df2e") w.power_plan = "balanced";
+        else if (g == L"8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c") w.power_plan = "high_performance";
+        else if (g == L"e9a42b02-d5df-448d-aa00-03f14749eb61") w.power_plan = "ultimate";
+        else if (g == L"a1841308-3541-4fab-bc81-f71556f20b4a") w.power_plan = "power_saver";
+        else if (!g.empty()) w.power_plan = "other";
+    }
+    // "Enhance pointer precision": the third value of SPI_GETMOUSE.
+    int mouse[3] = {};
+    if (SystemParametersInfoW(SPI_GETMOUSE, 0, mouse, 0)) w.pointer_precision = mouse[2] != 0;
+    return w;
 }
 
 bool Platform::vc_runtime_installed() {

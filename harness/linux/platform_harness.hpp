@@ -79,6 +79,13 @@ public:
     uint64_t start_elevated(const std::filesystem::path& exe, std::string* error) override;
     std::vector<std::filesystem::path> find_rawaccel_folders() override;
     bool vc_runtime_installed() override { return vc_runtime; }
+    fit::WindowsGameSettings windows_game_settings() override {  // made up, to show every kind of row
+        fit::WindowsGameSettings w;
+        w.game_mode = true;
+        w.power_plan = "balanced";
+        w.pointer_precision = true;
+        return w;
+    }
     std::filesystem::path programs_dir() override { return data_dir() / "programs"; }
     std::filesystem::path self_exe() override { return data_dir() / "FitSuite.exe"; }
     bool apply_update(const std::filesystem::path& new_exe, std::string* error) override;

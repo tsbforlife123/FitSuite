@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "fit/profile.hpp"
+#include "fit/windows_checks.hpp"
 
 namespace fitapp {
 
@@ -237,6 +238,8 @@ public:
         if (error) *error = "Updating is not available here.";
         return false;
     }
+    // A few Windows settings that matter for games, read only (Settings → Windows settings for games).
+    virtual fit::WindowsGameSettings windows_game_settings() { return {}; }
     // Ends FitSuite (as if "Quit" was chosen in the notification area).
     virtual void request_quit() {}
     // Restarts Windows in 5 seconds (after the player confirmed), to finish a driver install.
