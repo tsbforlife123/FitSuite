@@ -32,7 +32,8 @@ void SceneRenderer::begin(ImDrawList* dl, ImVec2 origin, ImVec2 size, const Came
     fwd_ = {std::cos(p) * std::sin(y), std::sin(p), std::cos(p) * std::cos(y)};
     right_ = {std::cos(y), 0.0, -std::sin(y)};
     up_ = {-std::sin(p) * std::sin(y), std::cos(p), -std::sin(p) * std::cos(y)};
-    // VALORANT keeps a 103° horizontal FOV at 16:9; other aspect ratios keep the 16:9 vertical FOV.
+    // The main game's horizontal FOV at 16:9 (VALORANT 103°); other screen shapes keep the 16:9 vertical
+    // FOV, as these games do, so the test matches the player's monitor and game.
     const double vfov = 2.0 * std::atan(std::tan(cam.hfov_deg_16x9 * kDegToRad / 2.0) * 9.0 / 16.0);
     fy_ = (size.y * 0.5) / std::tan(vfov / 2.0);
     fx_ = fy_;

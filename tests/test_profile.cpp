@@ -130,6 +130,7 @@ TEST_CASE("settings, mouse model and the last quick check round-trip; old files 
     p.app.pending_update_exe = "C:/x/update/FitSuite-v1.0.1.exe";
     p.app.pending_update_sha = std::string(64, 'a');
     p.app.pending_update_version = "1.0.1";
+    p.game.hfov = 98.0;
     MouseProfileRecord m;
     m.id = "mp1";
     m.label = "fix";
@@ -163,6 +164,7 @@ TEST_CASE("settings, mouse model and the last quick check round-trip; old files 
     CHECK(q->app.pending_update_exe == "C:/x/update/FitSuite-v1.0.1.exe");
     CHECK(q->app.pending_update_sha == std::string(64, 'a'));
     CHECK(q->app.pending_update_version == "1.0.1");
+    CHECK(q->game.hfov == doctest::Approx(98.0));
     REQUIRE(q->mouse_profiles.back().last_check);
     CHECK(q->mouse_profiles.back().last_check->verdict == "still_fits");
 

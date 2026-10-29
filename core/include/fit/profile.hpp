@@ -64,6 +64,9 @@ struct GameProfile {
     std::string id = "valorant";  // the game measured with: "valorant", or its executable name (main_game_exe)
     double sensitivity = 0.4;     // in-game value, for games FitSuite can convert (game_yaw > 0)
     double cm360 = 0.0;           // otherwise: mouse distance for a full turn, entered by the player
+    // Horizontal field of view at 16:9 the player entered, for games where it is a setting (0 = not
+    // entered: 103°). Games with a fixed view (game_fixed_hfov) ignore it.
+    double hfov = 0.0;
     double scoped_multiplier = 1.0;
     int fps_cap = 0;  // 0 = unlimited / unknown
     std::map<std::string, std::string> graphics;  // user-confirmed in-game settings

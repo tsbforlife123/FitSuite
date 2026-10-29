@@ -447,7 +447,7 @@ json to_json(const SetupProfile& p) {
                      {"source", p.display.source}}},
     };
     j["game"] = {{"id", p.game.id}, {"sensitivity", p.game.sensitivity}, {"cm360", p.game.cm360},
-                 {"scoped_multiplier", p.game.scoped_multiplier},
+                 {"hfov", p.game.hfov}, {"scoped_multiplier", p.game.scoped_multiplier},
                  {"fps_cap", p.game.fps_cap}, {"graphics", strmap_json(p.game.graphics)}};
     j["baseline"] = {{"captured_utc", p.baseline_captured_utc}, {"settings", strmap_json(p.baseline)}};
 
@@ -591,6 +591,8 @@ std::optional<SetupProfile> setup_from_json(const json& j, std::vector<std::stri
     p.game.id = g.str("id", "valorant");
     p.game.sensitivity = g.num("sensitivity", 0.4, 0.0001, 100.0);
     p.game.cm360 = g.num("cm360", 0.0, 0.0, 10000.0);
+    p.game.hfov = g.num("hfov", 0.0, 0.0, 170.0);
+    if (p.game.hfov > 0.0 && p.game.hfov < 50.0) p.game.hfov = 0.0;
     p.game.scoped_multiplier = g.num("scoped_multiplier", 1.0, 0.01, 10.0);
     p.game.fps_cap = g.i32("fps_cap", 0, 0, 10000);
     p.game.graphics = g.strmap("graphics");
