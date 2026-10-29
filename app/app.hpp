@@ -369,6 +369,9 @@ fit::GameMapping main_game_mapping(const fit::SetupProfile& s);
 std::string main_game_sens_label(const fit::SetupProfile& s);  // "VALORANT sensitivity" / "Fortnite full turn"
 void main_game_sens_input(App& app, float width);              // its sensitivity, or cm/360 for unconverted games
 void main_game_picker(App& app);                               // radio buttons, one per game
+// The mouse model box (Settings and setup): matches from FitSuite's checked mouse list as you type,
+// then that mouse's published specs and anything that does not fit them (a DPI it cannot do).
+void mouse_model_field(App& app, float width);
 // Mouse distance for a full turn, in cm (0 = not known).
 double main_game_cm360(const fit::SetupProfile& s);
 double game_cm360(const fit::SetupProfile& s, const GameChoice& g);

@@ -453,3 +453,13 @@ GitHub account that publishes releases; code signing would add that (FitSuite is
 "Switch Windows to … Hz" changes the saved display mode and asks you to keep it within 15 seconds; otherwise it
 reverts automatically, like Windows' own display settings. Every change is listed under History →
 Changes made by FitSuite with the way back.
+
+### Mouse list (Settings → Your mouse)
+
+Typing a mouse model shows matches from a short list of popular mice (Logitech, Razer, Zowie, SteelSeries).
+Each entry holds only what its maker's product page states (sensor, DPI range or steps, top report rate), with
+that page and the date it was checked; anything a page does not state is left blank. Mice do not tell Windows
+their DPI or software settings, so FitSuite never reads those from the mouse. For a listed mouse FitSuite
+warns when the DPI you entered is outside its range or not one of its fixed steps, and when it measured more
+reports a second than the mouse can send (probably a different mouse); a lower report rate than the mouse can do
+is mentioned for information. The list does not change the fix: the fix is always measured.

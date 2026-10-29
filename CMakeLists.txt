@@ -39,6 +39,7 @@ add_library(fitcore STATIC
   core/src/aim_report.cpp
   core/src/sha256.cpp
   core/src/update.cpp
+  core/src/mouse_db.cpp
 )
 target_include_directories(fitcore PUBLIC core/include third_party)
 
@@ -169,6 +170,7 @@ if(FITSUITE_BUILD_TESTS AND NOT CMAKE_CROSSCOMPILING)
     tests/test_check.cpp
     tests/test_rounds.cpp
     tests/test_update.cpp
+    tests/test_mouse_db.cpp
   )
   target_include_directories(fitsuite_tests PRIVATE tests third_party/doctest)
   target_link_libraries(fitsuite_tests PRIVATE fitcore)
