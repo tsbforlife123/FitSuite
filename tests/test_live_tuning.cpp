@@ -215,5 +215,6 @@ TEST_CASE("live tuning raises the overall speed slowly when every direction land
     off.overall = false;
     LiveTuner fixed(off);
     feed(fixed);
-    CHECK_FALSE(fixed.propose(RawAccelProfile{}).has_value());
+    // With the overall speed off it never moves (a chance direction difference may still be nudged).
+    if (const auto q = fixed.propose(RawAccelProfile{})) CHECK(overall_of(*q) == doctest::Approx(1.0).epsilon(1e-6));
 }
