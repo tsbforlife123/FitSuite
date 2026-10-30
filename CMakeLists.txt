@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(FitSuite VERSION 0.2.4 LANGUAGES C CXX)
+project(FitSuite VERSION 1.0.0 LANGUAGES C CXX)
 if(WIN32)
   enable_language(RC)
 endif()

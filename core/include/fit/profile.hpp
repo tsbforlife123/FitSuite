@@ -17,7 +17,7 @@
 
 namespace fit {
 
-inline constexpr const char* kAppVersion = "0.2.4";
+inline constexpr const char* kAppVersion = "1.0.0";
 inline constexpr int kSetupSchemaVersion = 1;
 
 using Conditions = std::map<std::string, std::string>;
