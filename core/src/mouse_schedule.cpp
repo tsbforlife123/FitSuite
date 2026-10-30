@@ -49,6 +49,44 @@ std::vector<TargetSpec> out_and_back(const std::vector<TargetSpec>& outward) {
     return out;
 }
 
+std::vector<TargetSpec> random_chain(std::vector<TargetSpec> specs, Rng& rng, double max_yaw, double max_pitch) {
+    // Random order, picking each next target among those that keep the aim inside the box. A random
+    // order can still corner itself near the end, so it starts over (up to 500 times) until the whole
+    // chain fits; the best try is used otherwise.
+    std::vector<TargetSpec> best_chain;
+    double best_total = std::numeric_limits<double>::infinity();
+    for (int attempt = 0; attempt < 500; ++attempt) {
+        std::vector<TargetSpec> left = specs, out;
+        out.reserve(specs.size());
+        double yaw = 0.0, pitch = 0.0, total_over = 0.0;
+        auto landing = [&](const TargetSpec& s) {
+            const double th = s.dir_deg * kDegToRad;
+            return std::make_pair(yaw + s.dist_deg * std::cos(th), pitch + s.dist_deg * std::sin(th));
+        };
+        while (!left.empty()) {
+            std::vector<size_t> ok;
+            size_t best = 0;
+            double best_over = std::numeric_limits<double>::infinity();
+            for (size_t i = 0; i < left.size(); ++i) {
+                const auto [y, p] = landing(left[i]);
+                const double over = std::max(0.0, std::fabs(y) - max_yaw) + std::max(0.0, std::fabs(p) - max_pitch);
+                if (over <= 0.0) ok.push_back(i);
+                if (over < best_over) best_over = over, best = i;
+            }
+            const size_t pick = ok.empty() ? best : ok[size_t(rng.below(ok.size()))];
+            if (ok.empty()) total_over += best_over;
+            const auto [y, p] = landing(left[pick]);
+            yaw = y;
+            pitch = p;
+            out.push_back(left[pick]);
+            left.erase(left.begin() + long(pick));
+        }
+        if (total_over <= 0.0) return out;
+        if (total_over < best_total) best_total = total_over, best_chain = out;
+    }
+    return best_chain;
+}
+
 Plan make_round_calibration_plan(const RoundPlanOptions& o) {
     Plan p;
     p.kind = SessionKind::Calibration;
@@ -56,9 +94,10 @@ Plan make_round_calibration_plan(const RoundPlanOptions& o) {
     Rng rng(o.seed ^ 0xA11ull);
     const int dirs = std::max(o.directions, 1);
     int block = 0;
-    auto add_pairs = [&](Task task, const std::vector<double>& dists, double radius, double timeout) {
+    auto add_pairs = [&](Task task, const std::vector<double>& dists, double radius, double timeout, bool chained = false) {
         std::vector<TargetSpec> outward;
         int i = 0;
+        for (int rep = 0; rep < (chained ? 2 : 1); ++rep)  // a chain: every direction and distance twice
         for (int d = 0; d < dirs; ++d)
             for (double dist : dists) {
                 TargetSpec s;
@@ -72,7 +111,8 @@ Plan make_round_calibration_plan(const RoundPlanOptions& o) {
                 outward.push_back(s);
             }
         rng.shuffle(outward);
-        p.blocks.push_back(out_and_back(outward));
+        p.blocks.push_back(chained ? random_chain(outward, rng, o.chain_max_yaw_deg, o.chain_max_pitch_deg)
+                                   : out_and_back(outward));
         p.block_condition.push_back(Condition::Baseline);
         BlockInfo bi;
         bi.task = task;
@@ -100,7 +140,7 @@ Plan make_round_calibration_plan(const RoundPlanOptions& o) {
     };
     // Flick, micro, flick, tracking, switching: the flick rounds bracket the others so fatigue and
     // warm-up spread evenly over the directions.
-    add_pairs(Task::Flick, o.flick_distances_deg, o.flick_radius_deg, o.flick_timeout_ms);
+    add_pairs(Task::Flick, o.flick_distances_deg, o.flick_radius_deg, o.flick_timeout_ms, o.first_flick_round_chained);
     if (o.micro_round) add_pairs(Task::Micro, o.micro_distances_deg, o.micro_radius_deg, o.micro_timeout_ms);
     for (int r = 1; r < o.flick_rounds; ++r) add_pairs(Task::Flick, o.flick_distances_deg, o.flick_radius_deg, o.flick_timeout_ms);
     if (o.track_round) add_special(Task::Track);

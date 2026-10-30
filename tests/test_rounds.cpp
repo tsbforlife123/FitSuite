@@ -2,6 +2,7 @@
 // data, the aim report and tracking analysis, and storage.
 #include <algorithm>
 #include <cmath>
+#include <map>
 #include <vector>
 
 #include "doctest.h"
@@ -109,7 +110,7 @@ Session simulate_rounds(sim::SimUserParams p, uint64_t seed, const RoundPlanOpti
 
 }  // namespace
 
-TEST_CASE("the round plan has flick, micro, flick, tracking and switching rounds of out-and-back pairs") {
+TEST_CASE("the round plan: a random chain first, then micro, returning flicks, tracking and switching") {
     const Plan p = make_round_calibration_plan({});
     REQUIRE(p.format() == 2);
     REQUIRE(p.blocks.size() == 5);
@@ -118,11 +119,27 @@ TEST_CASE("the round plan has flick, micro, flick, tracking and switching rounds
     CHECK(p.block_info[2].task == Task::Flick);
     CHECK(p.block_info[3].task == Task::Track);
     CHECK(p.block_info[4].task == Task::Switch);
-    CHECK(p.blocks[0].size() == 64);  // 8 directions × 4 distances, out and back
-    for (size_t i = 0; i + 1 < p.blocks[0].size(); i += 2) {
-        CHECK_FALSE(p.blocks[0][i].to_anchor);
-        CHECK(p.blocks[0][i + 1].to_anchor);
-        CHECK(p.blocks[0][i + 1].nominal_dist_deg == doctest::Approx(p.blocks[0][i].dist_deg));
+    // Round 1: 8 directions × 4 distances, each twice, chained from the crosshair (never back to the
+    // centre), staying within the box around the start.
+    REQUIRE(p.blocks[0].size() == 64);
+    std::map<std::pair<int, int>, int> seen;
+    double yaw = 0.0, pitch = 0.0;
+    for (const auto& s : p.blocks[0]) {
+        CHECK_FALSE(s.to_anchor);
+        ++seen[{int(std::lround(s.dir_deg)), int(std::lround(s.dist_deg))}];
+        yaw += s.dist_deg * std::cos(s.dir_deg * kDegToRad);
+        pitch += s.dist_deg * std::sin(s.dir_deg * kDegToRad);
+        CHECK(std::fabs(yaw) <= 40.0 + 1e-9);
+        CHECK(std::fabs(pitch) <= 20.0 + 1e-9);
+    }
+    CHECK(seen.size() == 32);
+    for (const auto& [k, n] : seen) CHECK(n == 2);
+    // Round 3 ("Returning flicks"): out and back.
+    REQUIRE(p.blocks[2].size() == 64);
+    for (size_t i = 0; i + 1 < p.blocks[2].size(); i += 2) {
+        CHECK_FALSE(p.blocks[2][i].to_anchor);
+        CHECK(p.blocks[2][i + 1].to_anchor);
+        CHECK(p.blocks[2][i + 1].nominal_dist_deg == doctest::Approx(p.blocks[2][i].dist_deg));
     }
     CHECK(p.scored_trials() == 64 + 32 + 64 + 36);
     // Validation blocks keep 16 targets each, now out and back.

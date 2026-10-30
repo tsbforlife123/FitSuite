@@ -222,6 +222,13 @@ void MouseTest::spawn_single(int64_t now) {
                 continue;
             }
             spec.dir_deg = std::fmod(std::atan2(dp, dy) * kRadToDeg + 360.0, 360.0);
+        } else {
+            // A chained round plans its targets to stay near the start; if misses left the crosshair far
+            // up or down, the target goes the other way vertically instead of further away.
+            const double up = spec.dist_deg * std::sin(spec.dir_deg * kDegToRad);
+            if (std::fabs(cam_.pitch_deg + up - anchor_pitch_) > 30.0 &&
+                std::fabs(cam_.pitch_deg - up - anchor_pitch_) < std::fabs(cam_.pitch_deg + up - anchor_pitch_))
+                spec.dir_deg = std::fmod(360.0 - spec.dir_deg, 360.0);
         }
         const double th = spec.dir_deg * kDegToRad;
         const double dyaw = spec.dist_deg * std::cos(th);
@@ -538,8 +545,9 @@ std::string MouseTest::round_body(int index) const {
                 return ui::fmt("Flick to the target, then flick back to the dot in the middle. One shot each; the next "
                                "target appears the moment you hit or miss, and each one disappears after %.1f s.",
                                secs);
-            return ui::fmt("Shoot each target. The next one appears the moment you hit or miss, and each target "
-                           "disappears after %.1f s. Flick at your normal in-game speed: quick but accurate.",
+            return ui::fmt("Shoot each target. The next one pops up somewhere around you, from wherever you are aiming, "
+                           "the moment you hit or miss; each target disappears after %.1f s. Flick at your normal in-game "
+                           "speed: quick but accurate.",
                            secs);
         case Task::Micro:
             return ui::fmt("Small, close targets: small, precise adjustments. Same rules: one shot each, %.1f s per "

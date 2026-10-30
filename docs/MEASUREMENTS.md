@@ -51,13 +51,13 @@ targets; a target that runs out is a timeout. The view is re-centred at the star
 
 | Round | What | Targets |
 |---|---|---|
-| 1 Flicks | 8 directions (every 45°) × 4 distances (7°, 13°, 20°, 26° of rotation), radius 1.2° | 32 out from the centre, each followed by one back to it: 64 |
+| 1 Flicks | 8 directions (every 45°) × 4 distances (7°, 13°, 20°, 26° of rotation), radius 1.2° | each direction × distance twice, as a random chain: every target appears from wherever the crosshair is, never back at the centre, within ±40° × ±20° of where the round started: 64 |
 | 2 Micro-adjustments | 8 directions × 2 distances (2°, 4°), radius 0.6° | 32 |
-| 3 Returning flicks | as round 1, new order: flick out to a target, then back to the dot in the middle | 64 |
+| 3 Returning flicks | 32 out from the centre, each followed by one back to the dot in the middle | 64 |
 | 4 Tracking | keep the crosshair on a target (radius 1.8°) wandering at 6–18°/s within ±15° × ±8°, easing into a new course every 0.8–1.6 s; a faint trail shows where it was over the last 0.15 s, and aiming at the trail counts as on target | 40 s |
 | 5 Target switching | 3 targets at a time at random spots within ±18° × ±9°, radius 1.0°; shoot them in any order | 36 |
 
-The out-and-back pairs keep the view near the horizon (so the direction you move the mouse matches the
+Round 1's chain is planned so that, played target after target, the view stays within ±40° × ±20° of its start (if misses leave the crosshair more than 30° up or down, the next target goes the other way vertically). The out-and-back pairs of rounds 2 and 3 keep the view near the horizon (so the direction you move the mouse matches the
 direction you see) and give every direction its opposite. The "back" target is placed at the round's
 centre, wherever the crosshair ended up. Nerd stats → Mouse → Calibrate can set 1–4 flick rounds and the
 flick target size.

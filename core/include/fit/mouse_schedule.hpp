@@ -21,8 +21,10 @@ struct CalibrationPlanOptions {
 
 // Round-based calibration (format 2): short rounds like an aim trainer. Each round starts with a
 // click; a new target appears the moment the last one was hit or missed, and every target has its
-// own timer. Flick and micro rounds alternate a target out from the round's centre and one back to
-// it, which keeps the view near the horizon and gives every direction its opposite.
+// own timer. The first flick round is a chain: every target appears in a random direction and distance
+// from wherever the crosshair is (each direction and distance twice), kept within a box around where the
+// round started. The micro round and the later flick round ("Returning flicks") alternate a target out
+// from the round's centre and one back to it, which gives every direction its opposite.
 struct RoundPlanOptions {
     std::vector<double> flick_distances_deg{7.0, 13.0, 20.0, 26.0};
     std::vector<double> micro_distances_deg{2.0, 4.0};
@@ -33,6 +35,8 @@ struct RoundPlanOptions {
     bool track_round = true;
     double flick_radius_deg = 1.2, micro_radius_deg = 0.6, switch_radius_deg = 1.0, track_radius_deg = 1.8;
     double flick_timeout_ms = 2200.0, micro_timeout_ms = 2200.0, switch_timeout_ms = 3000.0;
+    bool first_flick_round_chained = true;               // random targets around, not back to the centre
+    double chain_max_yaw_deg = 40.0, chain_max_pitch_deg = 20.0;  // where a chain may wander from its start
     int switch_kills = 36, switch_visible = 3;
     double track_duration_ms = 40000.0;
     uint64_t seed = 1;
@@ -84,6 +88,9 @@ Plan make_round_calibration_plan(const RoundPlanOptions& o);
 Plan make_validation_plan(const ValidationPlanOptions& o);
 // Out-and-back pairs: for each outward spec (dir/dist from the crosshair), a target back at the centre.
 std::vector<TargetSpec> out_and_back(const std::vector<TargetSpec>& outward);
+// A chain: the specs in a random order in which, played one after another from the crosshair, the aim
+// stays within ±max_yaw / ±max_pitch degrees of where it started (when such an order exists).
+std::vector<TargetSpec> random_chain(std::vector<TargetSpec> specs, Rng& rng, double max_yaw, double max_pitch);
 
 // The tracking round's target. It wanders inside a box around the round's centre and picks a new
 // direction and speed every 0.8–1.6 s, easing into it (about 0.3 s) instead of jumping, so it does
