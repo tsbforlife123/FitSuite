@@ -35,7 +35,17 @@ jobs:
         run: |
           cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_C_COMPILER=clang
           cmake --build build
-          ./build/fitsuite_tests
+          # Failing checks are also posted as an annotation, which anyone can read on the run's page.
+          set +e
+          ./build/fitsuite_tests > tests.log 2>&1
+          status=$?
+          set -e
+          cat tests.log
+          if [ "$status" -ne 0 ]; then
+            summary="$(grep -E 'ERROR|error:|TEST CASE|CHECK|REQUIRE|values:|test cases|assertions' tests.log | head -80 | sed ':a;N;$!ba;s/%/%25/g;s/\n/%0A/g')"
+            echo "::error title=Unit tests failed::${summary}"
+            exit "$status"
+          fi
 
       - name: Windows build and package
         run: |
