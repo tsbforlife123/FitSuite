@@ -493,6 +493,10 @@ json to_json(const SetupProfile& p) {
                       {"rawaccel_settings", p.fix_games.rawaccel_settings},
                       {"rawaccel_corrected", p.fix_games.rawaccel_corrected},
                       {"start_with_windows", p.fix_games.start_with_windows}};
+    j["live_tuning"] = {{"enabled", p.live.enabled}, {"fix_id", p.live.fix_id}, {"flicks", p.live.flicks},
+                        {"good", p.live.good}, {"overshoot", p.live.overshoot}, {"undershoot", p.live.undershoot},
+                        {"sideways", p.live.sideways}, {"updates", p.live.updates},
+                        {"last_update_utc", p.live.last_update_utc}, {"measured", p.live.measured}};
     json gs = json::object();
     for (const auto& [exe, v] : p.app.game_sens) gs[exe] = {{"sensitivity", v.sensitivity}, {"cm360", v.cm360}};
     j["app"] = {{"theme", p.app.theme},
@@ -706,6 +710,24 @@ std::optional<SetupProfile> setup_from_json(const json& j, std::vector<std::stri
         p.motion_sessions.push_back(ms);
     }
     p.motion_selected = mm.str("selected");
+    {
+        const Reader lt = r.obj("live_tuning");  // optional: absent in files from before 1.1
+        p.live.enabled = lt.flag("enabled", true);
+        p.live.fix_id = lt.str("fix_id", "", false, 128);
+        p.live.flicks = lt.i32("flicks", 0, 0, 100000000);
+        p.live.good = lt.i32("good", 0, 0, 100000000);
+        p.live.overshoot = lt.i32("overshoot", 0, 0, 100000000);
+        p.live.undershoot = lt.i32("undershoot", 0, 0, 100000000);
+        p.live.sideways = lt.i32("sideways", 0, 0, 100000000);
+        p.live.updates = lt.i32("updates", 0, 0, 100000000);
+        p.live.last_update_utc = lt.str("last_update_utc", "", false, 64);
+        if (const json* m = lt.array_raw("measured"); m && m->size() == 5) {
+            for (const auto& v : *m)
+                if (v.is_number() && std::isfinite(v.get<double>()) && v.get<double>() > -10.0 && v.get<double>() < 10.0)
+                    p.live.measured.push_back(v.get<double>());
+            if (p.live.measured.size() != 5) p.live.measured.clear();
+        }
+    }
     {
         const Reader fg = r.obj("fix_games");  // optional: absent in files from before this feature
         p.fix_games.enabled = fg.flag("enabled", false);

@@ -11,6 +11,7 @@
 #include "fit/update.hpp"
 #include "fit/frame.hpp"
 #include "fit/game_activation.hpp"
+#include "fit/live_tuning.hpp"
 #include "fit/mouse_check.hpp"
 #include "fit/mouse_compare.hpp"
 #include "fit/mouse_fit.hpp"
@@ -177,6 +178,8 @@ public:
     void start_check();
     // The chosen fix (Raw Accel-compatible profile), or nullptr.
     fit::MouseProfileRecord* active_fix();
+    // "Back to the measured fix": undoes everything live tuning changed.
+    void live_reset();
     // Days since the chosen fix was measured, blind-tested or checked; -1 without a fix.
     int days_since_fix_checked();
     bool check_due();  // per the reminder setting
@@ -338,6 +341,13 @@ private:
     bool whats_new_closed_ = false;  // closed for this launch
     bool checked_this_launch_ = false;  // updates are checked once each time FitSuite opens
     bool pending_update_tried_ = false; // an update waiting from last time is installed once, at start
+    // Live tuning (live_tuning.cpp in core): flicks in the game in front nudge the fix.
+    void tick_live();
+    bool live_capturing_ = false;
+    std::unique_ptr<fit::FlickDetector> live_detector_;
+    fit::LiveTuner live_tuner_;
+    double live_last_update_ = 0.0;
+    std::vector<RawEvent> live_events_;
     bool install_pending_update();
     double rawaccel_folder_checked_at_ = -100.0;
     std::filesystem::path rawaccel_folder_cache_;  // shutdown() ran (on exit, or when Windows ends the session)

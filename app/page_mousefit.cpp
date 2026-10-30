@@ -1584,6 +1584,39 @@ void games_box(App& app, MouseProfileRecord* fix, float w) {
     if (!ui_.patch_message.empty()) ui::wrapped(ui_.patch_message.c_str(), theme::kTextMuted);
     for (const auto& wmsg : ui_.patch_warnings) ui::callout(ui::Tone::Warn, nullptr, wmsg.c_str());
 
+    // Live tuning: the fix keeps learning from the player's flicks while it is on in a game.
+    if (fg.enabled && chosen) {
+        auto& lt = setup.live;
+        ImGui::Dummy(ImVec2(0, 2));
+        ImGui::Separator();
+        bool on = lt.enabled;
+        if (ImGui::Checkbox("Keep tuning the fix while I play", &on)) {
+            lt.enabled = on;
+            app.save();
+        }
+        ui::help_marker("While the fix is on in a game, FitSuite reads your mouse movement and clicks (never keys, the "
+                        "screen or the game). It judges each flick by how you finished it: where you stopped and shot is "
+                        "where you meant to go. When flicks in some directions keep landing short or long compared with "
+                        "the others, it nudges the fix a little: at most 1% per direction every 3 minutes, never past "
+                        "8%, your average unchanged.");
+        const bool mine = lt.fix_id == fix->id;
+        if (lt.enabled && mine && lt.flicks > 0) {
+            const double pct = 100.0 / double(lt.flicks);
+            ui::wrapped(ui::fmt("%d flicks judged: %.0f%% good, %.0f%% overshot, %.0f%% undershot, %.0f%% sideways.", lt.flicks,
+                                lt.good * pct, lt.overshoot * pct, lt.undershoot * pct, lt.sideways * pct)
+                            .c_str(),
+                        theme::kTextMuted);
+        } else if (lt.enabled) {
+            if (gs.fix_on == true) ui::faint("Watching your flicks in %s.", game_display_name(gs.game).c_str());
+            else ui::faint("Starts the next time the fix is on in a game.");
+        }
+        if (mine && lt.updates > 0) {
+            ui::faint("Adjusted %d time%s, last %s.", lt.updates, lt.updates == 1 ? "" : "s", short_time(lt.last_update_utc).c_str());
+            ImGui::SameLine();
+            if (ui::button_link("Back to the measured fix")) app.live_reset();
+        }
+    }
+
     // The other way: the fix as the Raw Accel default, on everywhere and all the time.
     if (!fg.enabled && driver) {
         ImGui::Dummy(ImVec2(0, 2));

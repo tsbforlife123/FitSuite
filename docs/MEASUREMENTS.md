@@ -31,7 +31,8 @@ shown once for the group.
   as each report arrives. Only one mouse is used per session (the one you pick, or the first that moves).
   Software-generated input (reports without a device handle, e.g. `SendInput`) and absolute-position
   devices (tablets, Remote Desktop, most VMs) are ignored and counted.
-* Raw input is registered only while a test runs, and reports are discarded whenever FitSuite is not the
+* Raw input is registered only while a test runs (or while live tuning is on and the fix is on in a game, see
+  *Live tuning*), and outside live tuning reports are discarded whenever FitSuite is not the
   foreground window. Leaving the window pauses the test, frees the pointer and discards the interrupted
   target (it is asked again later so blocks stay balanced). Esc stops at once.
 * During a test the scene renders without vsync (tearing when Windows allows it) at a capped rate of twice
@@ -471,3 +472,25 @@ their DPI or software settings, so FitSuite never reads those from the mouse. Fo
 warns when the DPI you entered is outside its range or not one of its fixed steps, and when it measured more
 reports a second than the mouse can send (probably a different mouse); a lower report rate than the mouse can do
 is mentioned for information. The list does not change the fix: the fix is always measured.
+
+### Live tuning (in your games)
+
+While the fix is on in a game and live tuning is on, the measured mouse's reports (movement and left
+clicks only) go through a flick finder (`core/src/live_tuning.cpp`). Speed is measured over the last 5 ms of
+reports in degrees per second, using the game's turn per count. A flick starts at the last still position
+when the speed passes 150°/s; its first movement ends when the speed falls below 30% of its peak or the
+movement turns back; the player has stopped when the speed stays under 20°/s for 90 ms. Only flicks shot
+(left click) within 350 ms of stopping, or while the aim was arriving, count; 3° to 60° of turn, first
+movement under 450 ms, whole flick under 1 s, and a first movement between 50% and 160% of the distance
+along the stop direction. The error is the first movement's end against the stop point: within 8% of the
+distance is good, otherwise overshoot, undershoot or sideways (whichever part is larger).
+
+Every 3 minutes at most, with at least 40 flicks and at least 3 of 8 direction sectors holding 4 or more,
+the log of distance / first movement is averaged per sector (10% trimmed at each end), centred on the
+sectors' mean (so only differences between directions count), and a sector changes only when its
+difference is at least 3 standard errors. Half of that difference is applied, at most 1% per sector; a
+clear mean angle error turns the rotation by half of it, at most 0.3°. Raw Accel's sensitivity, Y/X, L/R and
+U/D ratios are fitted to the new per-sector gains, the average gain is put back to what it was, and the
+result is scaled back toward no correction if it would pass 8% in any direction or 3° of rotation. The fix
+as measured is kept, and *Back to the measured fix* restores it.
+

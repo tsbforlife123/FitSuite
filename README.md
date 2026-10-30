@@ -209,15 +209,34 @@ folder (`%LOCALAPPDATA%\Programs\RawAccel` if the setup installed it).
 
 ---
 
+### Live tuning
+
+After your fix has passed the blind test and is on in your games, FitSuite keeps learning from your real
+flicks. It cannot see the screen, so it judges a flick by how you finished it: a fast first movement, maybe a
+small correction, then you stop and shoot. Where you stopped and shot is taken as where you meant to go.
+
+* **Good flick:** the first movement already ended within 8% of that point.
+* **Overshot / undershot / sideways:** it needed a correction, and which way.
+* Long turns, tracking, tiny adjustments, flicks you never shot and flicks shot mid-movement are left out.
+
+When flicks in some directions keep falling short or long compared with the others (a clear difference, not
+noise), FitSuite nudges the fix in those directions while you play: at most 1% per direction and 0.3° of
+rotation per change, at most every 3 minutes, never past the fix's 8% / 3° limits, and your average stays the
+same. The Mouse tab shows how many flicks were judged and how many were good, and **Back to the measured fix**
+undoes every nudge. Untick **Keep tuning the fix while I play** to stop it.
+
 ## What FitSuite does and does not do
 
-* It reads raw mouse input only while one of its own tests is running and its window is in front. Leaving
-  the window or pressing Esc releases the mouse immediately.
+* It reads raw mouse input while one of its own tests is running and its window is in front, and, with
+  **Keep tuning the fix while I play** on (Mouse tab, box 2; on by default once the per-game fix is on), while
+  the fix is on in one of your games: then it keeps only the movement and left clicks of the mouse you measured
+  with, never keys, and only to judge your flicks (see *Live tuning* below). Leaving a test or pressing Esc
+  releases the mouse immediately.
 * During your games it does at most one thing, and only if you turned on MouseFit's per-game fix: when Windows
   reports that a different program came to the front (an out-of-context event hook, so nothing is loaded into
   other programs), it reads that program's name and switches Raw Accel between your own settings and your
   settings with the fix. It never moves the mouse or presses keys, never opens the game's process, never reads
-  game memory or the screen, never reacts to anything in a match, and never touches anti-cheat. Without the
+  game memory or the screen, never reacts to anything on screen, and never touches anti-cheat. Live tuning reacts only to your own mouse movement, slowly (a small nudge at most every 3 minutes). Without the
   per-game fix it does nothing while you play; at most it waits in the notification area and wakes once a
   minute to see whether a quick-check reminder is due.
 * It never edits the registry for "tweaks", disables services or changes game files. The only things it can

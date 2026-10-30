@@ -1020,6 +1020,7 @@ void App::frame() {
     apply_theme();
     platform_.set_keep_running(keep_running());
     tick_games();
+    tick_live();
     tick_ra_install();
     tick_updater();
     if (save_pending_ && clock_s() >= save_due_) save_now();
@@ -1210,6 +1211,131 @@ void App::tick_games() {
     if (*d) games_on_for_ = games_fg_;
 }
 
+// ---- live tuning ----------------------------------------------------------------------------------
+
+namespace {
+
+// Degrees the game in front turns per mouse count, for telling flicks from small adjustments.
+double game_deg_per_count(const SetupProfile& s, const std::string& exe) {
+    const double yaw = game_yaw(exe);
+    if (exe == main_game_exe(s.game.id)) {
+        const GameMapping m = main_game_mapping(s);
+        if (m.valid()) return m.deg_per_count();
+    }
+    if (const auto it = s.app.game_sens.find(exe); it != s.app.game_sens.end()) {
+        if (yaw > 0.0 && it->second.sensitivity > 0.0) return yaw * it->second.sensitivity;
+        if (it->second.cm360 > 0.0 && s.mouse.dpi > 0) return 360.0 / (it->second.cm360 / 2.54 * double(s.mouse.dpi));
+    }
+    const GameMapping m = main_game_mapping(s);
+    return m.valid() ? m.deg_per_count() : 0.028;
+}
+
+}  // namespace
+
+// While the fix is on in a game, FitSuite reads the mouse (movement and clicks only), finds aimed
+// flicks, and every few minutes nudges the fix when flicks in some directions keep landing short or
+// long compared with the others (fit::LiveTuner: small steps, same bounds as the measured fix).
+void App::tick_live() {
+    auto& lt = setup_.live;
+    MouseProfileRecord* m = active_fix();
+    const bool want = lt.enabled && setup_.fix_games.enabled && games_on_ == true && !games_pending_ && m &&
+                      !mouse.test && !motion.test && !platform_.dev_harness() && !platform_.window_focused();
+    auto& rm = platform_.mouse();
+    if (!want) {
+        if (live_capturing_) {
+            live_capturing_ = false;
+            rm.set_capture_in_games(false);
+            if (!mouse.test && !motion.test) rm.stop();  // a test that just started keeps its capture
+            live_detector_.reset();
+        }
+        return;
+    }
+    if (lt.fix_id != m->id) {  // another fix: start counting afresh
+        lt = LiveTuningState{};
+        lt.fix_id = m->id;
+        live_tuner_ = LiveTuner{};
+        save();
+    }
+    if (!live_capturing_) {
+        std::string err;
+        rm.set_capture_in_games(true);
+        if (!rm.active() && !rm.start(&err)) {
+            rm.set_capture_in_games(false);
+            return;
+        }
+        live_capturing_ = true;
+        FlickDetectorOptions o;
+        o.deg_per_count = game_deg_per_count(setup_, games_on_for_);
+        live_detector_ = std::make_unique<FlickDetector>(o);
+        live_events_.clear();
+        rm.drain(live_events_);  // nothing from before the game counts
+        live_events_.clear();
+        if (live_last_update_ <= 0.0) live_last_update_ = clock_s();
+    }
+    live_events_.clear();
+    rm.drain(live_events_);
+    for (const auto& e : live_events_) {
+        if (e.injected || e.absolute) continue;
+        if (!setup_.mouse.device_id.empty() && e.device_id != setup_.mouse.device_id) continue;  // the measured mouse only
+        live_detector_->add({e.t_us, e.dx, e.dy, (e.buttons & kLeftDown) != 0});
+    }
+    live_detector_->tick(rm.now_us());
+    bool counted = false;
+    for (const auto& f : live_detector_->take()) {
+        live_tuner_.add(f);
+        ++lt.flicks;
+        switch (f.kind) {
+            case LiveFlick::Kind::Good: ++lt.good; break;
+            case LiveFlick::Kind::Overshoot: ++lt.overshoot; break;
+            case LiveFlick::Kind::Undershoot: ++lt.undershoot; break;
+            case LiveFlick::Kind::Sideways: ++lt.sideways; break;
+        }
+        counted = true;
+    }
+    if (counted) save();
+
+    // At most every 3 minutes, and only while Raw Accel is not busy.
+    if (clock_s() - live_last_update_ < 180.0 || writer_.token) return;
+    const auto next = live_tuner_.propose(m->transform.raw_accel);
+    if (!next) return;
+    live_last_update_ = clock_s();
+    auto& r = m->transform.raw_accel;
+    if (lt.measured.size() != 5) lt.measured = {r.rotation_deg, r.sens, r.yx_ratio, r.lr_ratio, r.ud_ratio};
+    r.rotation_deg = next->rotation_deg;
+    r.sens = next->sens;
+    r.yx_ratio = next->yx_ratio;
+    r.lr_ratio = next->lr_ratio;
+    r.ud_ratio = next->ud_ratio;
+    ++lt.updates;
+    lt.last_update_utc = utc_now_iso();
+    save_now();
+    std::string err;
+    const auto& g = setup_.fix_games;
+    if (games_write_corrected(&err))
+        rawaccel_run_writer(g.rawaccel_corrected, "game-on", "", &err, std::filesystem::path(g.rawaccel_settings).parent_path());
+}
+
+void App::live_reset() {
+    auto& lt = setup_.live;
+    MouseProfileRecord* m = active_fix();
+    if (m && lt.fix_id == m->id && lt.measured.size() == 5) {
+        auto& r = m->transform.raw_accel;
+        r.rotation_deg = lt.measured[0];
+        r.sens = lt.measured[1];
+        r.yx_ratio = lt.measured[2];
+        r.lr_ratio = lt.measured[3];
+        r.ud_ratio = lt.measured[4];
+    }
+    const bool enabled = lt.enabled;
+    lt = LiveTuningState{};
+    lt.enabled = enabled;
+    if (m) lt.fix_id = m->id;
+    live_tuner_ = LiveTuner{};
+    live_last_update_ = clock_s();
+    save_now();
+    toast(ui::Tone::Info, "Your fix is back to the measured one. It is used the next time a game comes to the front.");
+}
+
 App::GamesState App::games_state() const {
     GamesState s;
     s.enabled = setup_.fix_games.enabled;
@@ -1238,6 +1364,7 @@ double App::seconds_until_next_tick() const {
     if (save_pending_) s = std::min(s, std::max(0.0, save_due_ - clock_s()));
     if (games_restore_needed_) s = 0.0;
     if (update_busy() || ra_install.token) s = std::min(s, 0.1);
+    if (live_capturing_) s = std::min(s, 0.25);  // live tuning reads the mouse while a game is in front
     if (setup_.fix_games.enabled && games_error_.empty()) {
         // Woken at once when another program comes to the front; this is the fallback poll.
         s = std::min(s, 2.0);
@@ -1250,6 +1377,7 @@ void App::background_tick() {
     platform_.set_keep_running(keep_running());
     tick_writer();
     tick_games();
+    tick_live();
     tick_ra_install();
     tick_updater();
     if (save_pending_ && clock_s() >= save_due_) save_now();

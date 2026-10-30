@@ -167,8 +167,8 @@ void RawMouse::on_input(HRAWINPUT h) {
     if (GetRawInputData(h, RID_INPUT, buf, &size, sizeof(RAWINPUTHEADER)) == UINT(-1)) return;
     const RAWINPUT* ri = reinterpret_cast<const RAWINPUT*>(buf);
     if (ri->header.dwType != RIM_TYPEMOUSE) return;
-    // Only while FitSuite is the foreground window.
-    if (GetForegroundWindow() != main_) return;
+    // Only while FitSuite is the foreground window, or during live tuning while a game is in front.
+    if (!in_games_.load() && GetForegroundWindow() != main_) return;
     const RAWMOUSE& m = ri->data.mouse;
     RawEvent e;
     e.t_us = t;

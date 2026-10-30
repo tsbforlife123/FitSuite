@@ -178,6 +178,19 @@ struct GameSensitivity {
     double cm360 = 0.0;        // or the mouse distance for a full turn, entered directly (0 = not entered)
 };
 
+// Live tuning (Mouse tab → 2 Use it in your games): while the fix is on in a game, FitSuite judges
+// the player's flicks by how they finished them and nudges the fix (fit/live_tuning.hpp).
+struct LiveTuningState {
+    bool enabled = true;
+    std::string fix_id;                 // the fix these numbers belong to (reset when another is chosen)
+    int flicks = 0, good = 0, overshoot = 0, undershoot = 0, sideways = 0;
+    int updates = 0;                    // times the fix was nudged
+    std::string last_update_utc;
+    // The fix as measured and blind-tested (rotation, sens, Y/X, L/R, U/D), kept for "Back to the
+    // measured fix"; empty until the first nudge.
+    std::vector<double> measured;
+};
+
 // The Settings tab.
 struct AppSettings {
     std::string theme = "system";      // "system" | "light" | "dark"
@@ -229,6 +242,7 @@ struct SetupProfile {
     std::string active_mouse_profile;  // id, empty = baseline (no correction)
     std::vector<std::string> mouse_sessions;
     GameActivation fix_games;
+    LiveTuningState live;
     AppSettings app;
 
     std::vector<FrameConfig> frame_configs;

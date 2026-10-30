@@ -46,6 +46,7 @@ public:
     std::optional<MouseDevice> device(const std::string& id) override;
     int64_t now_us() const override { return qpc_now_us(); }
     uint64_t device_change_counter() const override { return device_changes_.load(); }
+    void set_capture_in_games(bool on) override { in_games_.store(on); }
 
 private:
     void thread_main();
@@ -56,6 +57,7 @@ private:
     HWND main_;
     std::thread thread_;
     std::atomic<bool> active_{false};
+    std::atomic<bool> in_games_{false};  // live tuning: keep reports while a game is in front
     std::atomic<DWORD> thread_id_{0};
     std::atomic<uint64_t> device_changes_{0};
     std::mutex mu_;

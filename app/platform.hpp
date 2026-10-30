@@ -49,6 +49,9 @@ public:
     virtual int64_t now_us() const = 0;
     // Increments whenever a mouse is connected or removed.
     virtual uint64_t device_change_counter() const = 0;
+    // Live tuning: also keep reports while another program (the game) is in front. Off by default;
+    // only movement and clicks are kept, never keys.
+    virtual void set_capture_in_games(bool on) {}
 };
 
 // ---- displays -----------------------------------------------------------------------------------
