@@ -240,7 +240,8 @@ bool transform_within_limits(const Transform& t, std::string* why) {
         if (std::fabs(r.rotation_deg) > kHardMaxAngleDeg) return fail("rotation exceeds the 6° safety limit");
         for (double v : {r.yx_ratio, r.lr_ratio, r.ud_ratio})
             if (!(v >= lo && v <= hi)) return fail("a ratio exceeds the 15% safety limit");
-        if (!(r.sens >= lo && r.sens <= hi)) return fail("sensitivity multiplier exceeds the 15% safety limit");
+        // The overall speed (up to 8%) comes on top of the direction part.
+        if (!(r.sens >= lo / 1.1 && r.sens <= hi * 1.1)) return fail("sensitivity multiplier exceeds the 25% safety limit");
         if (!r.speed.empty()) {
             if (r.speed.points.size() > 257) return fail("speed curve has more than Raw Accel's 257 points");
             double prev = 0.0;

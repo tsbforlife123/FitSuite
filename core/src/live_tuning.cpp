@@ -213,10 +213,12 @@ double mean_log_gain(const RawAccelProfile& p) {
     return s / 72.0;
 }
 
+// Directions are bounded relative to the overall speed (which has its own limit).
 bool within(const RawAccelProfile& p, const Bounds& b) {
     if (std::fabs(p.rotation_deg) > b.max_angle_deg + 1e-9) return false;
+    const double overall = std::exp(mean_log_gain(p));
     for (int i = 0; i < 72; ++i)
-        if (std::fabs(p.gain(double(i) * kTwoPi / 72.0) - 1.0) > b.max_gain_deviation + 1e-9) return false;
+        if (std::fabs(p.gain(double(i) * kTwoPi / 72.0) / overall - 1.0) > b.max_gain_deviation + 1e-9) return false;
     return true;
 }
 
@@ -249,7 +251,17 @@ std::optional<RawAccelProfile> LiveTuner::propose(const RawAccelProfile& current
         }
     }
     if (used < 3) return std::nullopt;
-    centre /= double(used);  // only differences between directions count: the average stays the same
+    centre /= double(used);  // the directions are judged against this average
+    // Overall speed: short (or long) in every direction alike. Its own, slower step and limit.
+    double doverall = 0.0;
+    if (o_.overall) {
+        double var = 0.0;
+        for (size_t b = 0; b < 8; ++b)
+            if (st[b].n >= o_.min_per_direction) var += st[b].se * st[b].se;
+        const double se = std::sqrt(var) / double(used);
+        if (std::fabs(centre) >= o_.min_t * se)
+            doverall = std::clamp(o_.rate * centre, -o_.max_overall_step_pct / 100.0, o_.max_overall_step_pct / 100.0);
+    }
 
     std::array<double, 8> target{};
     bool any = false;
@@ -267,7 +279,10 @@ std::optional<RawAccelProfile> LiveTuner::propose(const RawAccelProfile& current
     double drot = 0.0;
     if (rot.n >= o_.min_flicks && std::fabs(rot.mean) >= o_.min_t * rot.se)
         drot = std::clamp(o_.rate * rot.mean * kRadToDeg, -o_.max_step_deg, o_.max_step_deg);
-    if (!any && std::fabs(drot) < 1e-6) return std::nullopt;
+    const double lim = std::log(1.0 + o_.max_overall);
+    const double overall_now = mean_log_gain(current);
+    const double overall_next = std::clamp(overall_now + doverall, std::min(-lim, overall_now), std::max(lim, overall_now));
+    if (!any && std::fabs(drot) < 1e-6 && std::fabs(overall_next - overall_now) < 1e-6) return std::nullopt;
 
     RawAccelProfile base = current;
     base.rotation_deg = current.rotation_deg + drot;
@@ -290,9 +305,11 @@ std::optional<RawAccelProfile> LiveTuner::propose(const RawAccelProfile& current
     };
     const auto nm = nelder_mead(cost, std::vector<double>(4, 0.0), 0.01, 3000);
     RawAccelProfile next = make(nm.x);
-    next.sens *= std::exp(mean_log_gain(current) - mean_log_gain(next));  // same average as before
+    auto set_overall = [&](RawAccelProfile& p) { p.sens *= std::exp(overall_next - mean_log_gain(p)); };
+    set_overall(next);
 
-    // Never past the bounds of the measured fix: scale back toward no correction until it fits.
+    // Never past the bounds of the measured fix: the direction part is scaled back toward none until
+    // it fits; the overall speed stays as set.
     if (!within(next, o_.bounds)) {
         RawAccelProfile scaled = next;
         double lo = 0.0, hi = 1.0;
@@ -300,10 +317,10 @@ std::optional<RawAccelProfile> LiveTuner::propose(const RawAccelProfile& current
             const double s = 0.5 * (lo + hi);
             RawAccelProfile p = next;
             p.rotation_deg = next.rotation_deg * s;
-            p.sens = std::exp(std::log(next.sens) * s);
             p.yx_ratio = std::exp(std::log(next.yx_ratio) * s);
             p.lr_ratio = std::exp(std::log(next.lr_ratio) * s);
             p.ud_ratio = std::exp(std::log(next.ud_ratio) * s);
+            set_overall(p);
             if (within(p, o_.bounds)) {
                 lo = s;
                 scaled = p;

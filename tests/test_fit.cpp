@@ -114,9 +114,12 @@ TEST_CASE("fitted profiles always respect the bounds") {
     CHECK(r.directional.max_angle_deg() <= 2.0 + 1e-9);
     CHECK(r.directional_bounds_scaled);
     CHECK(r.raw_accel.yx_ratio <= 1.05 + 1e-9);
+    // The overall speed has its own limit; each direction is bounded relative to it.
+    const double overall = 1.0 + r.overall_pct / 100.0;
+    CHECK(std::fabs(overall - 1.0) <= 0.08 + 1e-9);
     for (int i = 0; i < 360; ++i) {  // per-direction bound holds for the Raw Accel candidate too
         const double th = (i + 0.5) * kDegToRad;
-        CHECK(std::fabs(r.raw_accel.gain(th) - 1.0) <= 0.05 + 1e-6);
+        CHECK(std::fabs(r.raw_accel.gain(th) / overall - 1.0) <= 0.05 + 1e-6);
         CHECK(std::fabs(r.raw_accel.angle(th)) * kRadToDeg <= 2.0 + 1e-6);
     }
 }
@@ -182,4 +185,23 @@ TEST_CASE("far targets landing short gets a speed curve; an even player does not
     }
     MESSAGE("even player: speed curve proposed in " << invented << " of 60 calibrations");
     CHECK(invented <= 4);
+}
+
+TEST_CASE("overall speed: first movements short everywhere give a faster overall speed, capped, on its own test") {
+    sim::SimUserParams p;
+    p.primary_gain = 0.95;  // 5% short in every direction, no direction differences
+    const Session s = simulate_calibration(p, 99, 4);
+    const FitResult r = fit_profiles(s);
+    REQUIRE(r.ok);
+    CHECK(r.overall_recommended);
+    CHECK(r.fix_recommended());
+    CHECK(r.overall_pct > 2.0);
+    CHECK(r.overall_pct <= 8.0 + 1e-9);
+    CHECK(r.raw_accel.sens > 1.02);
+
+    FitOptions no;
+    no.overall_speed = false;
+    const FitResult r2 = fit_profiles(s, no);
+    CHECK_FALSE(r2.overall_recommended);
+    CHECK(r2.raw_accel.sens == doctest::Approx(r.raw_accel.sens / (1.0 + r.overall_pct / 100.0)).epsilon(1e-6));
 }

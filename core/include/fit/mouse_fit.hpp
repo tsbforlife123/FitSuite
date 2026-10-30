@@ -34,6 +34,11 @@ struct FitOptions {
     bool speed_curve = true;
     double speed_max_effect = 0.05;    // a flick at the fastest or slowest measured level changes by at most 5%
     double negligible_speed = 0.02;    // fastest vs slowest level must differ by at least 2% to be worth it
+    // Overall speed: when the first movement lands short (or long) in every direction alike, the fix
+    // also makes the overall speed faster (or slower), by at most max_overall.
+    bool overall_speed = true;
+    double max_overall = 0.08;
+    double negligible_overall = 0.02;
     SegmentParams segment{};
 };
 
@@ -65,6 +70,14 @@ struct FitResult {
     bool raw_accel_bounds_scaled = false;      // the fitted correction was scaled down to the bounds
     double raw_accel_gain_mismatch = 0.0;      // max |g_RA - g_dir| over directions
     double raw_accel_angle_mismatch_deg = 0.0; // max |δ_RA - δ_dir| over directions
+
+    // Overall speed (part of the Raw Accel candidate: raw_accel.sens). Recommended on its own test;
+    // a fix is offered when either part is recommended (fix_recommended()).
+    ComponentTest overall_test;
+    bool overall_recommended = false;
+    double overall_pct = 0.0;            // + = faster everywhere
+    double overall_landing_pct = 0.0;    // where first movements landed on average (- = short)
+    bool fix_recommended() const { return raw_accel_recommended || overall_recommended; }
 
     // Speed curve (part of the Raw Accel candidate: raw_accel.speed). Fitted from the flick rounds:
     // log(distance ratio) against log(typical peak hand speed of the flick's distance level).

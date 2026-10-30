@@ -602,6 +602,46 @@ FitResult fit_profiles(const Session& s, const FitOptions& opt) {
         }
     }
 
+    // ---- overall speed ----------------------------------------------------------------------------
+    // Where first movements land on average, every distance level weighted alike. Short everywhere: a
+    // faster overall speed; long everywhere: slower; at most opt.max_overall either way. Most players'
+    // first movement stops a little short, so this usually comes out slightly faster; the blind test
+    // decides whether the fix is used at all.
+    if (opt.overall_speed && n > size_t(n_levels) + 1) {
+        std::vector<double> sum(size_t(n_levels), 0.0), cnt(size_t(n_levels), 0.0);
+        for (size_t i = 0; i < n; ++i) {
+            sum[size_t(obs[i].dist_level)] += yg[i];
+            cnt[size_t(obs[i].dist_level)] += 1.0;
+        }
+        double m = 0.0, used = 0.0, ss = 0.0;
+        for (size_t l = 0; l < sum.size(); ++l)
+            if (cnt[l] > 0.0) {
+                m += sum[l] / cnt[l];
+                used += 1.0;
+            }
+        m /= std::max(used, 1.0);
+        for (size_t i = 0; i < n; ++i) {
+            const size_t l = size_t(obs[i].dist_level);
+            const double d = yg[i] - sum[l] / cnt[l];
+            ss += d * d;
+        }
+        const double df = std::max(double(n) - used, 1.0);
+        const double se = std::sqrt(ss / df / double(n));
+        const double tt = se > 0.0 ? (m / se) * (m / se) : 0.0;
+        r.overall_test.statistic = tt;
+        r.overall_test.df = df;
+        r.overall_test.p_value = f_sf(tt, 1.0, df);
+        r.overall_test.significant = r.overall_test.p_value < opt.alpha;
+        r.overall_landing_pct = (std::exp(m) - 1.0) * 100.0;
+        const double lim = std::log(1.0 + std::clamp(opt.max_overall, 0.0, kHardMaxGainDeviation));
+        const double corr = std::clamp(-m, -lim, lim);
+        r.overall_recommended = r.overall_test.significant && std::fabs(std::exp(corr) - 1.0) >= opt.negligible_overall;
+        if (r.overall_recommended) {
+            r.overall_pct = (std::exp(corr) - 1.0) * 100.0;
+            r.raw_accel.sens *= std::exp(corr);
+        }
+    }
+
     // ---- in-sample effect (no adaptation assumed) -----------------------------------------------
     direction_biases(obs, n_levels, [](const Obs& o) { return o.e; }, r.max_radial_bias_before_pct,
                      r.max_angle_bias_before_deg);
@@ -612,10 +652,14 @@ FitResult fit_profiles(const Session& s, const FitOptions& opt) {
 
     r.ok = true;
     std::ostringstream os;
-    if (!r.directional_recommended && !r.raw_accel_recommended) {
+    if (!r.directional_recommended && !r.fix_recommended()) {
         os << "No correction recommended: your direction-to-direction differences are within measurement noise "
               "or too small to matter. Keep your current setup.";
     } else {
+        if (r.overall_recommended)
+            os << "Your first movements land " << std::lround(std::fabs(r.overall_landing_pct) * 10) / 10.0 << "% "
+               << (r.overall_landing_pct < 0 ? "short" : "long") << " on average, so the fix also makes your overall speed "
+               << (r.overall_pct > 0 ? "+" : "") << std::lround(r.overall_pct * 10) / 10.0 << "%. ";
         if (r.directional_recommended || r.raw_accel_test.significant)
             os << "Directional bias found (largest " << std::lround(r.max_radial_bias_before_pct * 10) / 10.0
                << "% distance, " << std::lround(r.max_angle_bias_before_deg * 10) / 10.0 << "° angle). ";

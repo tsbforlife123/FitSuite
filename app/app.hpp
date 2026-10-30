@@ -201,6 +201,13 @@ public:
                                std::string* message);
     // Undoes a Raw Accel change from the change log (puts the saved copy back and re-applies it).
     bool rawaccel_restore(fit::AppliedChange& change, std::string* error);
+    // Puts the fix into Raw Accel's own settings.json (Raw Accel then shows it and uses it all the
+    // time, even with FitSuite closed). The first time, a copy of the player's settings is saved and
+    // listed in History; later calls (live tuning, a new fix) rebuild from that copy. `live`: no
+    // message when Raw Accel has taken it.
+    bool fix_into_rawaccel(const fit::RawAccelProfile& fix, bool live, std::string* message);
+    // The fix is in Raw Accel's own settings (the change above is applied).
+    bool fix_in_rawaccel() const;
 
     // MotionFit
     void start_motion_test(MotionTestConfig cfg);
@@ -344,6 +351,7 @@ private:
     // Live tuning (live_tuning.cpp in core): flicks in the game in front nudge the fix.
     void tick_live();
     bool live_capturing_ = false;
+    std::string live_game_;            // the game live tuning is reading
     std::unique_ptr<fit::FlickDetector> live_detector_;
     fit::LiveTuner live_tuner_;
     double live_last_update_ = 0.0;

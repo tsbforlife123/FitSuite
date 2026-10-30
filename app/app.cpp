@@ -295,7 +295,7 @@ void App::analyze_calibration() {
         setup_.mouse_profiles.push_back(m);
         if (mouse.selected_profile.empty()) mouse.selected_profile = m.id;
     };
-    if (r.raw_accel_recommended) add(TransformKind::RawAccel, "Raw Accel-compatible");
+    if (r.fix_recommended()) add(TransformKind::RawAccel, "Raw Accel-compatible");
     if (r.directional_recommended) add(TransformKind::Directional, "Smooth directional");
 }
 
@@ -333,7 +333,7 @@ void App::on_mouse_test_done() {
         analyze_calibration();
         const FitResult& r = *mouse.fit;
         std::string summary = !r.ok ? r.message
-                              : (r.directional_recommended || r.raw_accel_recommended)
+                              : (r.directional_recommended || r.fix_recommended())
                                   ? "Directional bias found; candidate correction ready for blinded validation."
                                   : "No correction recommended; directional differences are within noise.";
         if (!mouse.calibration->complete) summary = "Partial calibration (" + reason + "). " + summary;
@@ -344,7 +344,7 @@ void App::on_mouse_test_done() {
                                                     : "Calibration analysed.");
         // A fix found by a full calibration goes straight to its blind test (its first screen has Start
         // and Cancel, so the player can still do it later from the Mouse tab).
-        if (mouse.calibration->complete && r.ok && r.raw_accel_recommended) {
+        if (mouse.calibration->complete && r.ok && r.fix_recommended()) {
             std::string fix_id;
             for (const auto& m : setup_.mouse_profiles)
                 if (m.calibration_session == mouse.calibration->id && m.transform.kind == TransformKind::RawAccel) fix_id = m.id;
@@ -421,18 +421,15 @@ void App::on_mouse_test_done() {
             // At least the main game, so the fix has somewhere to switch on.
             if (setup_.fix_games.games.empty()) setup_.fix_games.games.push_back(main_game_exe(setup_.game.id));
             save_now();
-            std::string msg, made;
-            const std::filesystem::path sj = rawaccel_installed() ? rawaccel_settings_ready(&made) : std::filesystem::path();
+            // Straight into Raw Accel's own settings: on all the time, even with FitSuite closed.
+            std::string msg;
             if (!rawaccel_installed())
-                toast(ui::Tone::Good, "Your fix passed. Install Raw Accel (Settings → About → Run the setup again) to use it in your games.", 10.0);
-            else if (sj.empty())
-                toast(ui::Tone::Warn, "Your fix passed, but Raw Accel's folder was not found. Click \"Turn on\" on the Mouse tab "
-                                      "and choose settings.json in your Raw Accel folder.", 12.0);
-            else if (games_turn_on(sj, &msg))
-                toast(ui::Tone::Good, "Your fix passed and is now on in your games.", 10.0);
+                toast(ui::Tone::Good, "Your fix passed. Install Raw Accel (Settings → About → Run the setup again) to use it.", 10.0);
+            else if (fix_into_rawaccel(m->transform.raw_accel, false, &msg))
+                toast(ui::Tone::Good, "Your fix passed and is now in Raw Accel: on all the time, even with FitSuite closed.", 10.0);
             else
-                toast(ui::Tone::Warn, "Your fix passed, but it could not be switched on: " + msg, 10.0);
-            mouse.patch_message = made.empty() ? msg : msg.empty() ? made : made + " " + msg;
+                toast(ui::Tone::Warn, "Your fix passed, but it could not be put into Raw Accel: " + msg, 12.0);
+            mouse.patch_message = msg;
         }
     }
     save();
@@ -942,6 +939,61 @@ bool App::rawaccel_make_default(const std::filesystem::path& settings_json, cons
     return true;
 }
 
+bool App::fix_in_rawaccel() const {
+    for (const auto& c : setup_.applied_changes)
+        if (c.kind == "mousefit.rawaccel_default" && c.status == "applied") return true;
+    return false;
+}
+
+bool App::fix_into_rawaccel(const RawAccelProfile& fix, bool live, std::string* message) {
+    namespace fs = std::filesystem;
+    std::string err, note;
+    // Per-game switching and this are two ways of doing the same thing: this one wins.
+    if (setup_.fix_games.enabled) {
+        setup_.fix_games.enabled = false;
+        games_restore_needed_ = false;
+        games_on_.reset();
+        for (auto& c : setup_.applied_changes)
+            if (c.kind == "mousefit.rawaccel_games" && c.status == "applied") {
+                c.status = "reverted";
+                c.reverted_utc = utc_now_iso();
+            }
+        platform_.set_keep_running(keep_running());
+    }
+    // Already in Raw Accel: rebuild from the copy of the player's own settings.
+    for (auto it = setup_.applied_changes.rbegin(); it != setup_.applied_changes.rend(); ++it) {
+        AppliedChange& c = *it;
+        if (c.kind != "mousefit.rawaccel_default" || c.status != "applied") continue;
+        auto own = read_file(c.before, &err, 8u << 20);
+        if (!own) return message && (*message = "Your saved Raw Accel settings could not be read: " + err, false);
+        auto r = patch_rawaccel_settings(*own, fix, "", &err);
+        if (!r) return message && (*message = err, false);
+        if (!atomic_write_file(c.target, r->json, &err)) return message && (*message = "Could not update settings.json: " + err, false);
+        mouse.patch_warnings = r->warnings;
+        save_now();
+        if (!rawaccel_run_writer(c.target, live ? "default-live" : "default", c.id, &err)) {
+            if (message) *message = "settings.json holds the fix; Raw Accel uses it when it next loads its settings. " + err;
+            return true;
+        }
+        if (message) *message = "Raw Accel's settings now hold your fix.";
+        return true;
+    }
+    // The first time: a copy of the player's settings, then the fix into settings.json.
+    const fs::path sj = rawaccel_settings_ready(&note);
+    if (sj.empty()) return message && (*message = "Raw Accel's folder was not found.", false);
+    auto own = read_file(sj, &err, 8u << 20);
+    if (!own) return message && (*message = err, false);
+    auto r = patch_rawaccel_settings(*own, fix, "", &err);
+    if (!r) return message && (*message = err, false);
+    const fs::path corrected = platform_.data_dir() / "rawaccel-with-fix.json";
+    if (!atomic_write_file(corrected, r->json, &err)) return message && (*message = err, false);
+    mouse.patch_warnings = r->warnings;
+    std::string msg;
+    const bool ok = rawaccel_make_default(sj, corrected, &msg);
+    if (message) *message = note.empty() ? msg : note + " " + msg;
+    return ok;
+}
+
 bool App::rawaccel_restore(AppliedChange& c, std::string* error) {
     if (c.kind == "mousefit.rawaccel_default") {
         auto text = read_file(c.before, error, 8u << 20);
@@ -977,6 +1029,13 @@ void App::tick_writer() {
         }
         games_pending_.reset();
         writer_ = {};
+        return;
+    }
+    if (writer_.purpose == "default-live") {  // live tuning updated the fix in Raw Accel: quiet unless it failed
+        if (!ok) toast(ui::Tone::Warn, ui::fmt("Raw Accel's writer could not apply the tuned fix (exit code %d); it is used when "
+                                               "Raw Accel next loads its settings.", *code), 12.0);
+        writer_ = {};
+        save();
         return;
     }
     if (writer_.purpose == "default") {
@@ -1238,8 +1297,22 @@ double game_deg_per_count(const SetupProfile& s, const std::string& exe) {
 void App::tick_live() {
     auto& lt = setup_.live;
     MouseProfileRecord* m = active_fix();
-    const bool want = lt.enabled && setup_.fix_games.enabled && games_on_ == true && !games_pending_ && m &&
-                      !mouse.test && !motion.test && !platform_.dev_harness() && !platform_.window_focused();
+    // The game in front: from per-game switching, or (fix in Raw Accel itself) one of the ticked games.
+    std::string game;
+    if (setup_.fix_games.enabled && games_on_ == true && !games_pending_) {
+        game = games_on_for_;
+    } else if (fix_in_rawaccel() && !platform_.window_focused()) {
+        const std::string fg = normalize_exe(platform_.foreground_app());
+        const auto& gs = setup_.fix_games.games;
+        if (!fg.empty() && std::find(gs.begin(), gs.end(), fg) != gs.end()) game = fg;
+    }
+    if (live_capturing_ && game != live_game_) {  // another game: start over with its turn rate
+        live_capturing_ = false;
+        platform_.mouse().set_capture_in_games(false);
+        live_detector_.reset();
+    }
+    const bool want = lt.enabled && !game.empty() && m && !mouse.test && !motion.test && !platform_.dev_harness() &&
+                      !platform_.window_focused();
     auto& rm = platform_.mouse();
     if (!want) {
         if (live_capturing_) {
@@ -1264,8 +1337,9 @@ void App::tick_live() {
             return;
         }
         live_capturing_ = true;
+        live_game_ = game;
         FlickDetectorOptions o;
-        o.deg_per_count = game_deg_per_count(setup_, games_on_for_);
+        o.deg_per_count = game_deg_per_count(setup_, game);
         live_detector_ = std::make_unique<FlickDetector>(o);
         live_events_.clear();
         rm.drain(live_events_);  // nothing from before the game counts
@@ -1310,9 +1384,13 @@ void App::tick_live() {
     lt.last_update_utc = utc_now_iso();
     save_now();
     std::string err;
-    const auto& g = setup_.fix_games;
-    if (games_write_corrected(&err))
-        rawaccel_run_writer(g.rawaccel_corrected, "game-on", "", &err, std::filesystem::path(g.rawaccel_settings).parent_path());
+    if (fix_in_rawaccel()) {
+        fix_into_rawaccel(r, true, &err);
+    } else {
+        const auto& g = setup_.fix_games;
+        if (games_write_corrected(&err))
+            rawaccel_run_writer(g.rawaccel_corrected, "game-on", "", &err, std::filesystem::path(g.rawaccel_settings).parent_path());
+    }
 }
 
 void App::live_reset() {
@@ -1333,7 +1411,11 @@ void App::live_reset() {
     live_tuner_ = LiveTuner{};
     live_last_update_ = clock_s();
     save_now();
-    toast(ui::Tone::Info, "Your fix is back to the measured one. It is used the next time a game comes to the front.");
+    std::string err;
+    if (m && fix_in_rawaccel() && !writer_.token && fix_into_rawaccel(m->transform.raw_accel, true, &err))
+        toast(ui::Tone::Info, "Your fix is back to the measured one, in Raw Accel.");
+    else
+        toast(ui::Tone::Info, "Your fix is back to the measured one. It is used the next time a game comes to the front.");
 }
 
 App::GamesState App::games_state() const {

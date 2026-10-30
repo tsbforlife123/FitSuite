@@ -582,7 +582,7 @@ void tab_candidates(App& app) {
         return;
     }
     const FitResult& r = *ui_.fit;
-    ui::callout(r.ok && (r.directional_recommended || r.raw_accel_recommended) ? ui::Tone::Info : ui::Tone::Neutral,
+    ui::callout(r.ok && (r.directional_recommended || r.fix_recommended()) ? ui::Tone::Info : ui::Tone::Neutral,
                 r.ok ? "Fit result" : "Not enough data", r.message.c_str());
     for (const auto& pr : r.data_problems) ui::muted("• %s", pr.c_str());
     if (r.ok) {
@@ -1312,9 +1312,19 @@ void page_mousefit(App& app) {
         if (begin_form("##mf_fixvals", 170.0f)) {
             struct D { const char* name; double deg; };
             static const D rows[4] = {{"Up", 90}, {"Down", -90}, {"Left", 180}, {"Right", 0}};
+            // Overall speed (the average over all directions), then each direction relative to it.
+            double lg = 0.0;
+            for (int i = 0; i < 72; ++i) lg += std::log(ra.gain(i * kTwoPi / 72.0));
+            const double overall = std::exp(lg / 72.0);
+            {
+                form_label("Overall speed");
+                double pct = (overall - 1.0) * 100.0;
+                if (std::fabs(pct) < 0.05) pct = 0.0;
+                ImGui::TextColored(theme::v4(std::fabs(pct) < 0.5 ? theme::kTextMuted : theme::kText), "%+.1f%%", pct);
+            }
             for (const auto& d : rows) {
                 form_label(ui::fmt("Sensitivity %s", d.name).c_str());
-                double pct = (ra.gain(d.deg * kDegToRad) - 1.0) * 100.0;
+                double pct = (ra.gain(d.deg * kDegToRad) / overall - 1.0) * 100.0;
                 if (std::fabs(pct) < 0.05) pct = 0.0;  // no "-0.0%"
                 ImGui::TextColored(theme::v4(std::fabs(pct) < 0.5 ? theme::kTextMuted : theme::kText), "%+.1f%%", pct);
             }
@@ -1585,7 +1595,7 @@ void games_box(App& app, MouseProfileRecord* fix, float w) {
     for (const auto& wmsg : ui_.patch_warnings) ui::callout(ui::Tone::Warn, nullptr, wmsg.c_str());
 
     // Live tuning: the fix keeps learning from the player's flicks while it is on in a game.
-    if (fg.enabled && chosen) {
+    if ((fg.enabled || app.fix_in_rawaccel()) && chosen) {
         auto& lt = setup.live;
         ImGui::Dummy(ImVec2(0, 2));
         ImGui::Separator();
@@ -1608,7 +1618,7 @@ void games_box(App& app, MouseProfileRecord* fix, float w) {
                         theme::kTextMuted);
         } else if (lt.enabled) {
             if (gs.fix_on == true) ui::faint("Watching your flicks in %s.", game_display_name(gs.game).c_str());
-            else ui::faint("Starts the next time the fix is on in a game.");
+            else ui::faint("Starts the next time one of the ticked games is in front.");
         }
         if (mine && lt.updates > 0) {
             ui::faint("Adjusted %d time%s, last %s.", lt.updates, lt.updates == 1 ? "" : "s", short_time(lt.last_update_utc).c_str());

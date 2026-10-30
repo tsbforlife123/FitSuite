@@ -209,6 +209,22 @@ folder (`%LOCALAPPDATA%\Programs\RawAccel` if the setup installed it).
 
 ---
 
+### Your fix goes into Raw Accel itself
+
+When a fix passes the blind test, FitSuite saves a copy of your Raw Accel `settings.json` (listed under
+History, with Undo) and puts the fix into Raw Accel's own settings. Raw Accel then shows the fixed values and
+uses them all the time, in every program, even when FitSuite is closed or after a restart. Live tuning writes
+its nudges there too. Per-game switching (**Turn on** in box 2) is still there if you want the fix only in
+your games.
+
+### Overall speed
+
+Besides the differences between directions, the fix can change your overall speed: when your first
+movements land short (or long) in every direction alike, it makes you faster (or slower), by at most 8%. Most
+people's first movement stops a little short, so this usually comes out slightly faster; the blind test
+decides whether the fix is used at all. The Mouse tab shows it as **Overall speed**, with each direction
+relative to it. Live tuning moves it too, more slowly (at most 0.5% per change, 8% in total).
+
 ### Live tuning
 
 After your fix has passed the blind test and is on in your games, FitSuite keeps learning from your real
@@ -220,9 +236,9 @@ small correction, then you stop and shoot. Where you stopped and shot is taken a
 * Long turns, tracking, tiny adjustments, flicks you never shot and flicks shot mid-movement are left out.
 
 When flicks in some directions keep falling short or long compared with the others (a clear difference, not
-noise), FitSuite nudges the fix in those directions while you play: at most 1% per direction and 0.3° of
+noise), FitSuite nudges the fix in those directions while you play (and the overall speed when every direction lands short or long): at most 1% per direction and 0.3° of
 rotation per change, at most every 3 minutes, never past the fix's 8% / 3° limits, and your average stays the
-same. The Mouse tab shows how many flicks were judged and how many were good, and **Back to the measured fix**
+same apart from the overall speed (at most 0.5% per change, 8% in total). The Mouse tab shows how many flicks were judged and how many were good, and **Back to the measured fix**
 undoes every nudge. Untick **Keep tuning the fix while I play** to stop it.
 
 ## What FitSuite does and does not do

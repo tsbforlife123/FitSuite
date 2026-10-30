@@ -494,3 +494,12 @@ U/D ratios are fitted to the new per-sector gains, the average gain is put back 
 result is scaled back toward no correction if it would pass 8% in any direction or 3° of rotation. The fix
 as measured is kept, and *Back to the measured fix* restores it.
 
+### Overall speed (calibration and live tuning)
+
+Calibration: the log of first-movement distance / target distance is averaged per distance level and over
+the levels; a t-test against 0 (alpha 0.01) decides, and the correction (minus that average) is capped at
+±8% and must be at least 2%. It multiplies Raw Accel's sensitivity; each direction is then bounded relative to
+it (8%), and stored fixes allow a sensitivity multiplier up to 25%. The quick check ignores it. Live tuning:
+the average over the direction sectors is the overall difference; when it is at least 3 standard errors,
+half of it is applied, at most 0.5% per change and 8% in total.
+

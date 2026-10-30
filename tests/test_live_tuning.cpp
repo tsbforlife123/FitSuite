@@ -112,7 +112,9 @@ TEST_CASE("live tuning nudges the fix toward the directions that fall short, in 
     std::mt19937 rng(7);
     std::uniform_real_distribution<double> dir(-180.0, 180.0), dist(14.0, 35.0);
     std::normal_distribution<double> noise(0.0, 0.03);
-    LiveTuner tuner;
+    LiveTunerOptions to;
+    to.overall = false;  // directions only here; the overall speed has its own test
+    LiveTuner tuner(to);
     // Down flicks land 6% short, the rest on average right (each flick ±3%).
     for (int i = 0; i < 160; ++i) {
         const double a = dir(rng), deg = dist(rng);
@@ -166,7 +168,52 @@ TEST_CASE("live tuning leaves the fix alone when the flicks show no pattern, and
         pushy.add(fl);
     }
     if (const auto next = pushy.propose(at_limit)) {
-        for (int i = 0; i < 72; ++i) CHECK(std::fabs(next->gain(i * kTwoPi / 72) - 1.0) <= 0.08 + 1e-6);
+        double lg = 0.0;
+        for (int i = 0; i < 72; ++i) lg += std::log(next->gain(i * kTwoPi / 72));
+        const double overall = std::exp(lg / 72);
+        CHECK(std::fabs(overall - 1.0) <= 0.08 + 1e-6);
+        for (int i = 0; i < 72; ++i) CHECK(std::fabs(next->gain(i * kTwoPi / 72) / overall - 1.0) <= 0.08 + 1e-6);
         CHECK(std::fabs(next->rotation_deg) <= 3.0 + 1e-9);
     }
+}
+
+TEST_CASE("live tuning raises the overall speed slowly when every direction lands short, up to 8%") {
+    std::mt19937 rng(5);
+    std::uniform_real_distribution<double> dir(-kPi, kPi);
+    std::normal_distribution<double> noise(0.0, 0.03);
+    auto feed = [&](LiveTuner& t) {
+        for (int i = 0; i < 160; ++i) {
+            LiveFlick fl;
+            fl.settled = raw_unit_from_screen_angle(dir(rng)) * 700.0;
+            fl.primary = fl.settled * (0.94 + noise(rng));  // 6% short everywhere
+            t.add(fl);
+        }
+    };
+    auto overall_of = [](const RawAccelProfile& p) {
+        double lg = 0.0;
+        for (int i = 0; i < 72; ++i) lg += std::log(p.gain(i * kTwoPi / 72));
+        return std::exp(lg / 72);
+    };
+    LiveTuner tuner;
+    feed(tuner);
+    const auto next = tuner.propose(RawAccelProfile{});
+    REQUIRE(next.has_value());
+    CHECK(overall_of(*next) > 1.004);
+    CHECK(overall_of(*next) <= 1.0051);  // at most 0.5% per change
+    // The same in every direction: the shape does not change.
+    CHECK(next->gain(kPi / 2) / next->gain(0.0) == doctest::Approx(1.0).epsilon(0.004));
+    // Many changes later it stops at 8%.
+    RawAccelProfile p = *next;
+    for (int k = 0; k < 40; ++k) {
+        feed(tuner);
+        if (const auto n2 = tuner.propose(p)) p = *n2;
+    }
+    CHECK(overall_of(p) <= 1.08 + 1e-6);
+    CHECK(overall_of(p) > 1.07);
+
+    LiveTunerOptions off;
+    off.overall = false;
+    LiveTuner fixed(off);
+    feed(fixed);
+    CHECK_FALSE(fixed.propose(RawAccelProfile{}).has_value());
 }

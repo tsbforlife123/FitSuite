@@ -7,7 +7,8 @@
 // movement already ended there is good; one that needed a correction overshot, undershot or went
 // sideways. When flicks in some directions keep falling short or long compared with the others, the
 // fix is nudged a little in those directions: small steps, at most every few minutes, always within
-// the same bounds as the measured fix (8% per direction, 3° of rotation), average unchanged.
+// the same bounds as the measured fix (8% per direction, 3° of rotation). When every direction lands
+// short (or long), the overall speed moves too, more slowly (0.5% per change, 8% in total).
 #pragma once
 
 #include <cstdint>
@@ -86,6 +87,9 @@ struct LiveTunerOptions {
     double max_step_pct = 1.0;    // largest change per direction per update
     double max_step_deg = 0.3;    // largest rotation change per update
     double min_t = 3.0;           // a direction counts only when its difference is this clear (mean / standard error)
+    bool overall = true;          // also change the overall speed when every direction lands short (or long)
+    double max_overall_step_pct = 0.5;  // per update
+    double max_overall = 0.08;    // in total, either way
     Bounds bounds{};
 };
 

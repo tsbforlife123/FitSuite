@@ -53,6 +53,7 @@ const char* to_string(CheckVerdict v) {
 
 FitOptions check_fit_options() {
     FitOptions o;
+    o.overall_speed = false;  // the quick check looks at directions only
     o.alpha = 0.005;
     o.min_per_direction = 4;
     o.min_total = 32;
