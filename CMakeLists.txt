@@ -41,6 +41,7 @@ add_library(fitcore STATIC
   core/src/update.cpp
   core/src/mouse_db.cpp
   core/src/windows_checks.cpp
+  core/src/live_tuning.cpp
 )
 target_include_directories(fitcore PUBLIC core/include third_party)
 
@@ -196,6 +197,7 @@ if(FITSUITE_BUILD_TESTS AND NOT CMAKE_CROSSCOMPILING)
     tests/test_update.cpp
     tests/test_mouse_db.cpp
     tests/test_windows_checks.cpp
+    tests/test_live_tuning.cpp
   )
   target_include_directories(fitsuite_tests PRIVATE tests third_party/doctest)
   target_link_libraries(fitsuite_tests PRIVATE fitcore)
